@@ -118,3 +118,5 @@ try {
     Write-Host 'PASS rejection: unknown license'
 } finally { Pop-Location }
 Write-Host "Release rejection checks passed. Evidence retained at $testRoot. Real provider signing remains pending."
+# Expected native failures above must not become the caller's process exit status.
+exit 0
