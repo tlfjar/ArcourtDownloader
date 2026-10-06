@@ -1,0 +1,98 @@
+{
+  "editor.formatOnSave": false,
+  "editor.codeLens": true,
+  "editor.rulers": [88],
+  "editor.renderWhitespace": "boundary",
+  "editor.stickyScroll.enabled": true,
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.formatOnSave": true,
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.tabSize": 2
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features",
+    "editor.tabSize": 2
+  },
+  "[yaml]": {
+    "editor.tabSize": 2
+  },
+  "[markdown]": {
+    "files.trimTrailingWhitespace": false
+  },
+  "go.useLanguageServer": true,
+  "go.formatTool": "goimports",
+  "go.toolsManagement.autoUpdate": true,
+  "go.lintTool": "golangci-lint-v2",
+  "go.lintOnSave": "off",
+  "go.testTimeout": "300s",
+  "go.testOnSave": false,
+  "go.coverOnSave": false,
+  "go.buildFlags": [],
+  "go.buildTags": "",
+  "go.testTags": "",
+  "go.testFlags": ["-short"],
+  "go.toolsEnvVars": {
+    "GOWORK": "off"
+  },
+  "go.delveConfig": {
+    "debugAdapter": "dlv-dap"
+  },
+  "gopls": {
+    "build.buildFlags": [],
+    "build.directoryFilters": [
+      "-**/node_modules",
+      "-bin",
+      "-downloads",
+      "-.arcourt-local"
+    ],
+    "ui.semanticTokens": true,
+    "ui.diagnostic.analyses": {
+      "unusedparams": true,
+      "nilness": true
+    },
+    "ui.diagnostic.staticcheck": true
+  },
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "*.go": "$(capture)_test.go",
+    "go.mod": "go.sum",
+    "go.work": "go.work.sum"
+  },
+  "search.exclude": {
+    "**/node_modules/**": true,
+    "bin/**": true,
+    "downloads/**": true,
+    ".arcourt-local/**": true,
+    "coverage.out": true,
+    "**/__debug_bin*": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/bin/**": true,
+    "**/downloads/**": true,
+    "**/.arcourt-local/**": true
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.env.windows": {
+    "GOWORK": "off"
+  },
+  "terminal.integrated.env.linux": {
+    "GOWORK": "off"
+  },
+  "terminal.integrated.env.osx": {
+    "GOWORK": "off"
+  }
+}

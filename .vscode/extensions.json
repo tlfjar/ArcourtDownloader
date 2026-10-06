@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "golang.go",
+    "openai.chatgpt",
+    "GitHub.copilot-chat",
+    "GitHub.vscode-pull-request-github",
+    "github.vscode-github-actions",
+    "EditorConfig.EditorConfig",
+    "ms-vscode.PowerShell",
+    "redhat.vscode-yaml",
+    "usernamehw.errorlens"
+  ]
+}

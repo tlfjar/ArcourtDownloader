@@ -1,0 +1,45 @@
+name: Software bug
+description: Report a reproducible software problem using synthetic data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, use [private reporting](https://github.com/tlfjar/ArcourtDownloader/security/advisories/new).
+        Public issues must exclude court PDFs, client documents, credentials, signed URLs, browser profiles, and unredacted client screenshots.
+        Do not attach live captures, raw logs, settings, or manifests. Use fabricated examples and text only.
+  - type: input
+    id: version
+    attributes:
+      label: Application version or source revision
+      description: For an unversioned development build, give its source commit and whether it has local changes.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows version/architecture, CLI or desktop, browser/version, and WebView2 version for UI issues. For source builds, include Go and Node versions. Omit personal paths.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Synthetic reproduction
+      description: Give numbered steps with fabricated case metadata or a local fixture. Do not include live case identifiers or URLs containing credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Describe the result and any controlled error message in sanitized text; no sensitive attachments.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: This report contains only synthetic reproduction data and excludes all sensitive materials listed above.
+          required: true

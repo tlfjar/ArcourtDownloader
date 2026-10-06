@@ -1,0 +1,242 @@
+name: Signed draft release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+env:
+  GOWORK: 'off'
+  GOFLAGS: '-mod=readonly'
+defaults:
+  run:
+    shell: pwsh
+jobs:
+  preflight:
+    name: Exact tag and protected main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - run: ./scripts/release-preflight.ps1
+        env:
+          GH_TOKEN: ${{ github.token }}
+  verify:
+    name: Exact source verification
+    # Re-run all source gates at the tag's immutable event commit, without secrets.
+    # Main ancestry is necessary but never substitutes for these results.
+    uses: ./.github/workflows/check.yml
+    permissions:
+      contents: read
+  build:
+    name: Production unsigned inputs
+    needs: [preflight, verify]
+    runs-on: windows-2025
+    timeout-minutes: 20
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload.outputs.artifact-digest }}
+      attempt: ${{ steps.stage.outputs.attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.8'
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+      - id: stage
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GATE_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          . ./scripts/workflow-common.ps1
+          Assert-ReleaseGates ($env:GATE_RESULTS | ConvertFrom-Json) @('preflight','verify')
+          ./scripts/stage-release-inputs.ps1 -Tag $env:RELEASE_TAG
+      - id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/release-inputs/*
+          if-no-files-found: error
+          retention-days: 14
+  sign:
+    name: Approved provider signing
+    needs: [preflight, verify, build]
+    runs-on: windows-2025
+    timeout-minutes: 30
+    environment: release-signing
+    permissions:
+      contents: read
+      actions: read
+    # Integration adds ONLY the selected provider's environment secret/OIDC permission.
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload.outputs.artifact-digest }}
+      attempt: ${{ steps.sign.outputs.attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.8'
+          cache: false
+      - name: Download exact build artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_ID: ${{ needs.build.outputs.artifact-id }}
+          INPUT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
+          BUILD_ATTEMPT: ${{ needs.build.outputs.attempt }}
+          GATE_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          . ./scripts/workflow-common.ps1
+          Assert-ReleaseGates ($env:GATE_RESULTS | ConvertFrom-Json) @('preflight','verify','build')
+          ./scripts/release-preflight.ps1
+          ./scripts/get-workflow-artifact.ps1 -ArtifactId $env:INPUT_ID -Digest $env:INPUT_DIGEST -Name "unsigned-$env:GITHUB_RUN_ID-$env:BUILD_ATTEMPT" -Destination build/unsigned -Files @('ArcourtDownloader.exe','arcourt-download.exe','build-manifest.json')
+      - id: sign
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          INPUT_ID: ${{ needs.build.outputs.artifact-id }}
+          INPUT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
+          BUILD_ATTEMPT: ${{ needs.build.outputs.attempt }}
+        run: ./scripts/sign-release-inputs.ps1 -Tag $env:RELEASE_TAG -BuildAttempt $env:BUILD_ATTEMPT -ArtifactId $env:INPUT_ID -ArtifactDigest $env:INPUT_DIGEST
+      - id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/signed/*
+          if-no-files-found: error
+          retention-days: 14
+  package:
+    name: Verify signed inputs and package
+    needs: [build, sign]
+    runs-on: windows-2025
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload.outputs.artifact-digest }}
+      attempt: ${{ steps.package.outputs.attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.8'
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+      - name: Download pinned inputs and outputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_ID: ${{ needs.build.outputs.artifact-id }}
+          INPUT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
+          BUILD_ATTEMPT: ${{ needs.build.outputs.attempt }}
+          SIGNED_ID: ${{ needs.sign.outputs.artifact-id }}
+          SIGNED_DIGEST: ${{ needs.sign.outputs.artifact-digest }}
+          SIGN_ATTEMPT: ${{ needs.sign.outputs.attempt }}
+        run: |
+          ./scripts/get-workflow-artifact.ps1 -ArtifactId $env:INPUT_ID -Digest $env:INPUT_DIGEST -Name "unsigned-$env:GITHUB_RUN_ID-$env:BUILD_ATTEMPT" -Destination build/unsigned -Files @('ArcourtDownloader.exe','arcourt-download.exe','build-manifest.json')
+          ./scripts/get-workflow-artifact.ps1 -ArtifactId $env:SIGNED_ID -Digest $env:SIGNED_DIGEST -Name "signed-$env:GITHUB_RUN_ID-$env:SIGN_ATTEMPT" -Destination build/signed -Files @('ArcourtDownloader.exe','arcourt-download.exe','signing-evidence.json')
+      - id: package
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          INPUT_ID: ${{ needs.build.outputs.artifact-id }}
+          INPUT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
+          BUILD_ATTEMPT: ${{ needs.build.outputs.attempt }}
+        run: ./scripts/package-release-inputs.ps1 -Tag $env:RELEASE_TAG -BuildAttempt $env:BUILD_ATTEMPT -ArtifactId $env:INPUT_ID -ArtifactDigest $env:INPUT_DIGEST
+      - id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/releases/${{ github.ref_name }}/*
+          if-no-files-found: error
+          retention-days: 14
+  attest:
+    name: Attest final ZIP and SBOM
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download and check final candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          CANDIDATE_ID: ${{ needs.package.outputs.artifact-id }}
+          CANDIDATE_DIGEST: ${{ needs.package.outputs.artifact-digest }}
+          PACKAGE_ATTEMPT: ${{ needs.package.outputs.attempt }}
+        run: |
+          ./scripts/get-workflow-artifact.ps1 -ArtifactId $env:CANDIDATE_ID -Digest $env:CANDIDATE_DIGEST -Name "candidate-$env:GITHUB_RUN_ID-$env:PACKAGE_ATTEMPT" -Destination build/candidate -Files @("ArcourtDownloader-$env:RELEASE_TAG-windows-amd64.zip","ArcourtDownloader-$env:RELEASE_TAG-SBOM.spdx.json",'SHA256SUMS.txt')
+          . ./scripts/workflow-common.ps1
+          Get-CandidateChecksums (Join-Path $PWD 'build/candidate') $env:RELEASE_TAG | Out-Null
+      - name: Final artifact provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/candidate/*.zip
+            build/candidate/*.spdx.json
+      - name: SPDX SBOM attestation for ZIP
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-path: build/candidate/*.zip
+          sbom-path: build/candidate/ArcourtDownloader-${{ github.ref_name }}-SBOM.spdx.json
+  draft:
+    name: Stage draft only
+    needs: [package, attest]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download exact attested candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          CANDIDATE_ID: ${{ needs.package.outputs.artifact-id }}
+          CANDIDATE_DIGEST: ${{ needs.package.outputs.artifact-digest }}
+          PACKAGE_ATTEMPT: ${{ needs.package.outputs.attempt }}
+        run: ./scripts/get-workflow-artifact.ps1 -ArtifactId $env:CANDIDATE_ID -Digest $env:CANDIDATE_DIGEST -Name "candidate-$env:GITHUB_RUN_ID-$env:PACKAGE_ATTEMPT" -Destination build/candidate -Files @("ArcourtDownloader-$env:RELEASE_TAG-windows-amd64.zip","ArcourtDownloader-$env:RELEASE_TAG-SBOM.spdx.json",'SHA256SUMS.txt')
+      - name: Verify provenance, reconcile identical draft, upload missing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: ./scripts/stage-draft-release.ps1 -Tag $env:RELEASE_TAG -AssetsPath (Join-Path $PWD 'build/candidate')

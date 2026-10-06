@@ -1,0 +1,15 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Arcourt Downloader",
+  "outputfilename": "ArcourtDownloader",
+  "frontend:install": "npm ci --ignore-scripts",
+  "frontend:build": "npm run build",
+  "author": { "name": "ArcourtDownloader contributors" },
+  "info": {
+    "companyName": "ArcourtDownloader",
+    "productName": "Arcourt Downloader",
+    "productVersion": "0.0.0.0",
+    "copyright": "ArcourtDownloader contributors",
+    "comments": "Development build; source unknown"
+  }
+}

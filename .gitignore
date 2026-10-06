@@ -1,0 +1,38 @@
+# Local builds, test output, and Delve temporary executables.
+/bin/
+/build/
+/coverage.out
+/go.work
+/go.work.sum
+*.test
+*.test.exe
+__debug_bin*
+
+# Local court downloads, manifests, browser profiles, and other runtime data.
+# Keep these in a dedicated directory; do not ignore all PDFs (fixtures may be PDFs).
+/downloads/
+/.arcourt-local/
+# Service-created case directories at custom in-repository output locations.
+**/case-[0-9][0-9]*-[0-9]*-[0-9]*/
+arcourt-manifest.json
+
+# Local environment/configuration; track examples deliberately.
+.env
+.env.*
+!.env.example
+!.env.*.example
+/.vscode/*.local.json
+
+# Frontend dependencies if introduced by the desktop implementation.
+node_modules/
+/desktop/frontend/dist/
+/desktop/frontend/wailsjs/
+/desktop/frontend/package.json.md5
+/desktop/build/bin/
+/desktop/build/windows/icon.ico
+/desktop/*.syso
+
+# OS metadata.
+.DS_Store
+Thumbs.db
+Desktop.ini

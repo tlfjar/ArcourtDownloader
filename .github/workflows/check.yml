@@ -1,0 +1,180 @@
+name: Verify standalone application
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+env:
+  GOWORK: 'off'
+  GOFLAGS: '-mod=readonly'
+defaults:
+  run:
+    shell: pwsh
+jobs:
+  unit:
+    name: Browserless checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.8'
+          cache-dependency-path: |
+            go.sum
+            desktop/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+      - name: Unit tests, vet, core/CLI builds, frontend, desktop controller
+        run: ./scripts/check.ps1
+      - name: Build identity rejection checks
+        run: ./scripts/test-build-info.ps1
+      - name: Build identity on Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/test-build-info.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell build identity checks failed' }
+      - name: Race detector on Linux
+        if: runner.os == 'Linux'
+        run: |
+          go test -race ./... -count=1 -timeout=180s
+          if ($LASTEXITCODE -ne 0) { throw 'Core race tests failed' }
+          Push-Location desktop
+          try {
+            go test -race ./internal/app -count=1 -timeout=180s
+            if ($LASTEXITCODE -ne 0) { throw 'Controller race tests failed' }
+          } finally { Pop-Location }
+      - name: Git integrity and clean sources
+        run: |
+          git fsck --full
+          if ($LASTEXITCODE -ne 0) { throw 'Git integrity failed' }
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Checks changed tracked files' }
+  browser-fixtures:
+    name: Local browser DOM and CLI fixtures (Windows)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.8'
+      - run: ./scripts/check-fixtures.ps1
+      - run: |
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Browser fixtures changed sources or locks' }
+  desktop:
+    name: Windows desktop build and local package
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.8'
+          cache-dependency-path: |
+            go.sum
+            desktop/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+      - name: Local unsigned package and rejection checks
+        run: |
+          $output = ./scripts/package-windows.ps1
+          $output | Write-Output
+          $assets = @($output | Where-Object { $_ -like 'Package assets: *' })
+          if ($assets.Count -ne 1) { throw 'Missing package output directory' }
+          ./scripts/test-release-packaging.ps1 -AssetsPath $assets[0].Substring(16)
+      - name: Build must preserve tracked sources and locks
+        run: |
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging changed tracked files' }
+    # Interactive WebView2/dialog smoke is a separate local gate; no release/upload.
+  govulncheck:
+    name: Go vulnerability scan (${{ matrix.module }})
+    runs-on: windows-2025
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [root, desktop]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.8'
+          cache-dependency-path: |
+            go.sum
+            desktop/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.12.0'
+          package-manager-cache: false
+      - name: Scan production Windows packages
+        env:
+          SCAN_MODULE: ${{ matrix.module }}
+        run: ./scripts/check-vulnerabilities.ps1 -Module $env:SCAN_MODULE
+      - run: |
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Vulnerability scan changed sources or locks' }
+  workflow-policy:
+    name: Release workflow policy and rehearsals
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.8'
+      - run: ./scripts/test-release-workflow.ps1
+      - name: Validate workflow syntax and action pins
+        run: |
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck= -pyflakes=
+          if ($LASTEXITCODE -ne 0) { throw 'Workflow validation failed' }
+  dependency-review:
+    name: Dependency review (public PR)
+    if: github.event_name == 'pull_request' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          comment-summary-in-pr: never
+          warn-only: false
+    # Private rehearsals skip this control; that is not a successful review.
+    # Enable CodeQL default setup in GitHub; no advanced CodeQL workflow is used.

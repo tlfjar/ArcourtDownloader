@@ -1,0 +1,42 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      routine-go:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: gomod
+    directory: /desktop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      routine-desktop:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /desktop/frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      routine-frontend:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      routine-actions:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [minor, patch]

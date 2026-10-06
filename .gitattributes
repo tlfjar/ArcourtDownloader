@@ -1,0 +1,3 @@
+/THIRD_PARTY_NOTICES.txt text eol=lf
+/scripts/licenses/*.json text eol=lf
+/desktop/frontend/src/* text eol=lf

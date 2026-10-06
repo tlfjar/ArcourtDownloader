@@ -1,0 +1,91 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "cwd": "${workspaceFolder}",
+    "env": {
+      "GOWORK": "off"
+    }
+  },
+  "tasks": [
+    {
+      "label": "Go: Environment",
+      "type": "process",
+      "command": "go",
+      "args": ["env", "GOVERSION", "GOOS", "GOARCH", "GOMOD", "GOWORK", "CGO_ENABLED"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Go: Build core",
+      "type": "process",
+      "command": "go",
+      "args": ["build", "./..."],
+      "problemMatcher": ["$go"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Go: Test core (short)",
+      "type": "process",
+      "command": "go",
+      "args": ["test", "-short", "-count=1", "-timeout=300s", "./..."],
+      "problemMatcher": ["$go"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Go: Test active package (short)",
+      "type": "process",
+      "command": "go",
+      "args": ["test", "-short", "-count=1", "-timeout=300s", "."],
+      "options": {
+        "cwd": "${fileDirname}",
+        "env": {
+          "GOWORK": "off"
+        }
+      },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Go: Vet core",
+      "type": "process",
+      "command": "go",
+      "args": ["vet", "./..."],
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Go: Coverage (short)",
+      "type": "process",
+      "command": "go",
+      "args": ["test", "-short", "-count=1", "-timeout=300s", "-coverprofile=coverage.out", "./..."],
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Go: Race tests (optional native C toolchain)",
+      "type": "process",
+      "command": "go",
+      "args": ["test", "-race", "-short", "-count=1", "-timeout=300s", "./..."],
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Go: Lint (optional golangci-lint v2)",
+      "type": "process",
+      "command": "golangci-lint",
+      "args": ["run", "./..."],
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "Go: Verify core",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Go: Build core",
+        "Go: Vet core",
+        "Go: Test core (short)"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

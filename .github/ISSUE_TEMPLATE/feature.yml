@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a bounded software improvement using synthetic examples.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Public issues must exclude court PDFs, client documents, credentials, signed URLs, browser profiles, and unredacted client screenshots.
+        Describe the use case with fabricated data, without sensitive attachments. Court access, legal advice, and official notices are outside software support.
+  - type: input
+    id: version
+    attributes:
+      label: Application version or source revision
+      description: Give the version or commit you use, or say that you have not tried a build yet.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Intended environment
+      description: CLI or desktop, Windows version/architecture, and relevant browser/runtime details.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Problem and synthetic example
+      description: Explain the workflow problem using fabricated metadata and steps someone could reproduce locally.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior and alternatives
+      description: Describe the improvement and alternatives you have considered.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: This request uses only synthetic examples and excludes all sensitive materials listed above.
+          required: true

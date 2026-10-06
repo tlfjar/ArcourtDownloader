@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Go: Debug arcourt tests",
+      "type": "go",
+      "request": "launch",
+      "debugAdapter": "dlv-dap",
+      "mode": "test",
+      "program": "${workspaceFolder}/arcourt",
+      "cwd": "${workspaceFolder}/arcourt",
+      "args": ["-test.short", "-test.timeout=300s"],
+      "env": {
+        "GOWORK": "off"
+      },
+      "maxStringLen": 2048,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Go: Debug active package tests (open a Go file)",
+      "type": "go",
+      "request": "launch",
+      "debugAdapter": "dlv-dap",
+      "mode": "test",
+      "program": "${fileDirname}",
+      "cwd": "${fileDirname}",
+      "args": ["-test.short", "-test.timeout=300s"],
+      "env": {
+        "GOWORK": "off"
+      },
+      "maxStringLen": 2048,
+      "console": "integratedTerminal"
+    }
+  ]
+}
