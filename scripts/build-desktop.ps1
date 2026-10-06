@@ -2,14 +2,17 @@ param([switch]$Fixture, [switch]$Release, [string]$Tag, [string]$Version)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 if ($Fixture -and $Release) { throw 'Fixture desktop builds are forbidden in release mode.' }
+if ($Release) { . (Join-Path $PSScriptRoot 'release-common.ps1') }
 $identity = & (Join-Path $PSScriptRoot 'resolve-build-info.ps1') -Release:$Release -Tag $Tag -Version $Version
 $configPath = Join-Path $repo 'desktop/wails.json'
 $originalConfig = [IO.File]::ReadAllBytes($configPath)
 $previousWork = $env:GOWORK
 $previousCGO = $env:CGO_ENABLED
+$previousToolchain = $env:GOTOOLCHAIN
 $env:GOWORK = 'off'
 $env:CGO_ENABLED = '0'
 try {
+    if ($Release) { $env:GOTOOLCHAIN = Get-ReviewedGoToolchain }
     $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
     $config.info.productVersion = $identity.windowsVersion
     $config.info.comments = "$($identity.version); source $($identity.commit)" + $(if ($identity.release) { '; release source' } else { '; development, unsigned' })
@@ -29,5 +32,5 @@ try {
     } finally { Pop-Location }
 } finally {
     try { [IO.File]::WriteAllBytes($configPath, $originalConfig) }
-    finally { $env:GOWORK = $previousWork; $env:CGO_ENABLED = $previousCGO }
+    finally { $env:GOWORK = $previousWork; $env:CGO_ENABLED = $previousCGO; $env:GOTOOLCHAIN = $previousToolchain }
 }

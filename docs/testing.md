@@ -19,8 +19,8 @@ reviewed Go 1.26.8 toolchain. After `scripts/package-windows.ps1`, run
 `scripts/test-release-packaging.ps1 -AssetsPath <printed-directory>` for archive
 mutation and release rejection checks. These use isolated temporary assets and
 a temporary Git repository; they do not create tags in this repository or sign
-anything. Synthetic signer tests demonstrate policy logic only, not public
-signature readiness.
+anything. Synthetic Authenticode results test rejection of unexpected signature
+states; the actual Windows check requires `NotSigned` for both executables.
 
 The root module owns the core and CLI. The nested `desktop/` module uses its own
 lockfile and a legitimate `replace` to `..`. Root `go test ./...` does not test
@@ -50,6 +50,11 @@ checks. Executables are written to ignored `build/bin/`, assets to
 mismatched release identities. Windows CI runs it in both PowerShell 7 and
 Windows PowerShell 5.1, including the expected missing-HEAD probe before the
 first source commit.
+`scripts/test-tagged-unsigned-release.ps1` makes a tag only in an isolated copy
+of the source, builds both production binaries, and runs the tagged packaging
+and verification entry points with a simulated artifact download. It compares
+the final ZIP executable hashes to the build manifest. Artifact download
+metadata and digest checks are rehearsed separately by `test-release-workflow.ps1`.
 
 Coverage includes:
 
@@ -114,7 +119,7 @@ instructions and remaining release work are in [releasing](releasing.md).
 on Ubuntu and Windows, Linux race checks, Windows local browser fixtures, and a
 Windows desktop/local package build. It checks Git integrity and verifies that
 checks/builds preserve tracked sources and lockfiles. CI does not perform live
-court requests, human GUI walkthroughs, signing, or release publication.
+court requests, human GUI walkthroughs, or release publication.
 
 CI also runs pinned govulncheck for each Go module's Windows packages, workflow
 policy/rejection rehearsals, actionlint, and dependency review on public PRs.
@@ -125,20 +130,18 @@ additional source checks with PowerShell 7.4+ and Go 1.26.8:
 .\scripts\check-vulnerabilities.ps1 -Module root
 .\scripts\check-vulnerabilities.ps1 -Module desktop
 .\scripts\test-release-workflow.ps1
-go test ./scripts/signing-tool -count=1
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck= -pyflakes=
 if ($LASTEXITCODE -ne 0) { throw 'Workflow validation failed' }
 ```
 
 Workflow rehearsals use isolated Git repositories and synthetic artifacts. They
 cover malformed tags, tags outside protected main, absent/failed exact-source
-gates, missing provider configuration, fixture inputs, wrong build association,
-draft checksum/commit mismatch, and published/immutable overwrite refusal. The
-PE comparison tests alter executable bytes, certificate layout and padding.
-These tests never create a real repository tag/release or call a signing provider.
-The separate tag-only release workflow reuses all source gates before signing,
-packaging, attesting and staging a draft; publication remains an operator action.
-Public dependency review, hosted signing and hosted attestations require actual
+gates, fixture inputs, wrong build association, substituted final executables,
+unexpected signature states, draft checksum/commit mismatch, and
+published/immutable overwrite refusal. These tests never create a real
+repository tag/release. The separate tag-only release workflow reuses all source
+gates before packaging, attesting and staging a draft; publication remains an
+operator action. Public dependency review and hosted attestations require actual
 hosted evidence. Private skipped/unavailable controls remain pending. Configure
 CodeQL default setup in GitHub; no advanced CodeQL workflow is configured here.
 
@@ -156,5 +159,5 @@ candidate, record only its version/source and executable hashes, date, and
 outcome. Preview an authorized case, confirm the header, select and download a
 PDF, open it, repeat to verify a skip, then close and check owned-browser cleanup.
 Keep case identifiers, docket labels, documents, URLs, and screenshots private.
-The production human walkthrough and final signed-candidate live check remain
+The production human walkthrough and final unsigned-candidate live check remain
 pending; do not substitute synthetic tests for them.

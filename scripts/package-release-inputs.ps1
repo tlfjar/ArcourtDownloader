@@ -1,29 +1,26 @@
 #requires -Version 7.4
 param(
     [Parameter(Mandatory)][string]$Tag,
-    [Parameter(Mandatory)][string]$BuildAttempt,
-    [Parameter(Mandatory)][string]$ArtifactId,
-    [Parameter(Mandatory)][string]$ArtifactDigest
+    [Parameter(Mandatory)][ValidatePattern('^[1-9][0-9]*$')][string]$BuildAttempt,
+    [Parameter(Mandatory)][ValidatePattern('^[1-9][0-9]*$')][string]$ArtifactId,
+    [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{64}$')][string]$ArtifactDigest
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'workflow-common.ps1')
 $identity = & (Join-Path $PSScriptRoot 'resolve-build-info.ps1') -Release -Tag $Tag
-$unsigned = Join-Path $script:ReleaseRepo 'build/unsigned'
-$signed = Join-Path $script:ReleaseRepo 'build/signed'
-Assert-InputManifest $unsigned $identity $env:GITHUB_REPOSITORY $env:GITHUB_RUN_ID $BuildAttempt
-Assert-FileSet $signed @('ArcourtDownloader.exe','arcourt-download.exe','signing-evidence.json')
-$evidence = Get-Content -LiteralPath (Join-Path $signed 'signing-evidence.json') -Raw | ConvertFrom-Json
-if ($evidence.schemaVersion -ne 1 -or $evidence.request.artifactId -cne $ArtifactId -or $evidence.request.artifactDigest -cne $ArtifactDigest) { throw 'Signed output artifact association mismatch.' }
-$manifest = Get-Content -LiteralPath (Join-Path $unsigned 'build-manifest.json') -Raw | ConvertFrom-Json | ConvertTo-Json -Depth 10 -Compress
-if (($evidence.request.build | ConvertTo-Json -Depth 10 -Compress) -cne $manifest) { throw 'Signed output build association mismatch.' }
-Assert-SignedAssociation $unsigned $signed
-$inputs = New-BuildDirectory $script:ReleaseRepo 'package-inputs'
-foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) {
-    if ($evidence.signedSha256.$name -cne (Get-SHA256 (Join-Path $signed $name))) { throw 'Signed evidence checksum mismatch.' }
-    Copy-Item -LiteralPath (Join-Path $signed $name) -Destination $inputs
-}
+$inputs = Join-Path $script:ReleaseRepo 'build/unsigned'
+& (Join-Path $PSScriptRoot 'get-workflow-artifact.ps1') -ArtifactId $ArtifactId -Digest $ArtifactDigest -Name "unsigned-$env:GITHUB_RUN_ID-$BuildAttempt" -Destination $inputs -Files @('ArcourtDownloader.exe','arcourt-download.exe','build-manifest.json')
+Assert-InputManifest $inputs $identity $env:GITHUB_REPOSITORY $env:GITHUB_RUN_ID $BuildAttempt
+foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { Assert-UnsignedExecutable (Join-Path $inputs $name) }
+if (Test-Path -LiteralPath (Join-Path $script:ReleaseRepo 'build/package-inputs')) { throw 'Package input directory must be new.' }
+$packageInputs = New-BuildDirectory $script:ReleaseRepo 'package-inputs'
+foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { Copy-Item -LiteralPath (Join-Path $inputs $name) -Destination $packageInputs }
+Assert-FileSet $packageInputs @('ArcourtDownloader.exe','arcourt-download.exe')
 & (Join-Path $PSScriptRoot 'generate-notices.ps1') -Check
 $assets = Join-Path $script:ReleaseRepo "build/releases/$Tag"
-& (Join-Path $PSScriptRoot 'package-windows.ps1') -Release -Tag $Tag -SignedBinariesPath $inputs -OutputPath $assets
-& (Join-Path $PSScriptRoot 'verify-release-assets.ps1') -AssetsPath $assets -Tag $Tag
+& (Join-Path $PSScriptRoot 'package-windows.ps1') -UnsignedRelease -Tag $Tag -BinariesPath $packageInputs -OutputPath $assets
+& (Join-Path $PSScriptRoot 'verify-release-assets.ps1') -AssetsPath $assets -Tag $Tag -UnsignedRelease
+
+# Check the final ZIP bytes against the manifest from the pinned build artifact.
+Assert-CandidateBuildBinaries (Join-Path $assets "ArcourtDownloader-$Tag-windows-amd64.zip") (Join-Path $inputs 'build-manifest.json')
 "attempt=$env:GITHUB_RUN_ATTEMPT" >> $env:GITHUB_OUTPUT

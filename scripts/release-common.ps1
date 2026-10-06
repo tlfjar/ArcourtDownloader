@@ -43,13 +43,36 @@ function Assert-Checksums([string]$Directory, [string[]]$Names, [string]$Checksu
     $expected = foreach ($name in ($Names | Sort-Object -CaseSensitive)) { '{0}  {1}' -f (Get-SHA256 (Join-Path $Directory $name)), $name }
     if ([IO.File]::ReadAllText((Join-Path $Directory $ChecksumName)) -cne (($expected -join "`n") + "`n")) { throw "Checksum mismatch: $ChecksumName" }
 }
-function Assert-ApprovedSignature([string]$Path) {
-    $policy = Get-Content -LiteralPath (Join-Path $script:ReleaseRepo 'scripts/signing-policy.json') -Raw | ConvertFrom-Json
-    if ($policy.schemaVersion -ne 1 -or -not $policy.provider -or -not $policy.subject -or @($policy.certificateSha256).Count -eq 0) { throw 'Approved signing provider configuration is missing. See docs/releasing.md.' }
+function Assert-NoPeCertificateTable([string]$Path) {
+    $reader = [IO.BinaryReader]::new([IO.File]::OpenRead($Path))
+    try {
+        $length = $reader.BaseStream.Length
+        if ($length -lt 0x100 -or $reader.ReadUInt16() -ne 0x5A4D) { throw 'Malformed Windows executable.' }
+        $reader.BaseStream.Position = 0x3C
+        [long]$pe = $reader.ReadUInt32()
+        if ($pe -lt 0x40 -or $pe -gt $length - 24) { throw 'Malformed PE header offset.' }
+        $reader.BaseStream.Position = $pe
+        if ($reader.ReadUInt32() -ne 0x4550) { throw 'Malformed PE signature.' }
+        $reader.BaseStream.Position = $pe + 20
+        $optionalSize = $reader.ReadUInt16()
+        $optional = $pe + 24
+        if ($optional -gt $length - $optionalSize) { throw 'Truncated PE optional header.' }
+        $reader.BaseStream.Position = $optional
+        $magic = $reader.ReadUInt16()
+        if ($magic -eq 0x10B) { $countOffset = 92; $directoryOffset = 96 }
+        elseif ($magic -eq 0x20B) { $countOffset = 108; $directoryOffset = 112 }
+        else { throw 'Unknown PE optional header format.' }
+        if ($optionalSize -lt $directoryOffset + 40) { throw 'Missing PE certificate directory.' }
+        $reader.BaseStream.Position = $optional + $countOffset
+        if ($reader.ReadUInt32() -lt 5) { throw 'Missing PE certificate directory.' }
+        $reader.BaseStream.Position = $optional + $directoryOffset + 32
+        if ($reader.ReadUInt32() -ne 0 -or $reader.ReadUInt32() -ne 0) { throw 'PE certificate table must be absent for an unsigned release.' }
+    } finally { $reader.Dispose() }
+}
+function Assert-UnsignedExecutable([string]$Path) {
     $sig = Get-AuthenticodeSignature -LiteralPath $Path
-    if ($sig.Status -ne 'Valid' -or -not $sig.SignerCertificate -or -not $sig.TimeStamperCertificate) { throw 'Missing/invalid timestamped Authenticode signature.' }
-    $fingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($sig.SignerCertificate.RawData)).ToLowerInvariant()
-    if ($sig.SignerCertificate.Subject -cne $policy.subject -or $fingerprint -cnotin @($policy.certificateSha256)) { throw 'Authenticode signer does not match the approved provider identity.' }
+    if ($null -eq $sig -or $sig.Status -cne 'NotSigned' -or $null -ne $sig.SignerCertificate -or $null -ne $sig.TimeStamperCertificate) { throw 'Expected Authenticode status NotSigned with no signer or timestamp certificate.' }
+    Assert-NoPeCertificateTable $Path
 }
 function Invoke-Evidence([string]$Binaries, $Identity, [string]$Output) {
     if ((Get-SHA256 (Join-Path $script:ReleaseRepo 'scripts/licenses/spdx-schema-2.3.json')) -cne '239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b') { throw 'Pinned SPDX schema changed.' }
@@ -61,7 +84,7 @@ function Invoke-Evidence([string]$Binaries, $Identity, [string]$Output) {
     } finally { Pop-Location; $env:GOTOOLCHAIN = $previousToolchain }
     if (-not (Test-Json -LiteralPath $Output -SchemaFile (Join-Path $script:ReleaseRepo 'scripts/licenses/spdx-schema-2.3.json'))) { throw 'SBOM does not match the pinned SPDX 2.3 schema.' }
 }
-function Assert-Payload([string]$Directory, $Identity, [switch]$Local) {
+function Assert-Payload([string]$Directory, $Identity) {
     Assert-FileSet $Directory $script:PayloadNames
     Assert-Checksums $Directory @($script:PayloadNames | Where-Object { $_ -ne 'FILE_SHA256SUMS.txt' }) 'FILE_SHA256SUMS.txt'
     $build = Get-Content -LiteralPath (Join-Path $Directory 'BUILD.json') -Raw | ConvertFrom-Json
@@ -70,7 +93,7 @@ function Assert-Payload([string]$Directory, $Identity, [switch]$Local) {
     $resource = (Get-Item -LiteralPath (Join-Path $Directory 'ArcourtDownloader.exe')).VersionInfo
     $suffix = if ($Identity.release) { '; release source' } else { '; development, unsigned' }
     if ($resource.FileVersion -cne $Identity.windowsVersion -or $resource.ProductVersion -cne $Identity.windowsVersion -or $resource.Comments -cne "$($Identity.version); source $($Identity.commit)$suffix") { throw 'GUI Windows resource identity mismatch.' }
-    foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { if (-not $Local) { Assert-ApprovedSignature (Join-Path $Directory $name) } }
+    foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { Assert-UnsignedExecutable (Join-Path $Directory $name) }
     foreach ($name in @('LICENSE','THIRD_PARTY_NOTICES.txt','README.md','SUPPORT.md','SECURITY.md','docs/command-line-workflow.md','docs/releasing.md')) {
         if ([IO.File]::ReadAllText((Join-Path $Directory $name)) -cne [IO.File]::ReadAllText((Join-Path $script:ReleaseRepo $name)).Replace("`r`n","`n")) { throw "Payload differs from reviewed source: $name" }
     }

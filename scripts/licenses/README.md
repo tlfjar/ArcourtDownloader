@@ -77,5 +77,5 @@ relationships. `NOASSERTION` on composite executable license conclusions does
 not replace dependency license information. Its fixed metadata epoch supports
 repeatable output for identical inputs; it is not a signing/build time. Binary
 identity is read without executing either deliverable. This identifies the
-declared build; the trusted build/signing handoff and provenance must establish
+declared build; the pinned build-artifact handoff and provenance must establish
 its association with the approved build, since a stamp is not an attestation.

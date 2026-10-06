@@ -106,6 +106,8 @@ jobs:
           $assets = @($output | Where-Object { $_ -like 'Package assets: *' })
           if ($assets.Count -ne 1) { throw 'Missing package output directory' }
           ./scripts/test-release-packaging.ps1 -AssetsPath $assets[0].Substring(16)
+      - name: Isolated tagged unsigned release rehearsal
+        run: ./scripts/test-tagged-unsigned-release.ps1
       - name: Build must preserve tracked sources and locks
         run: |
           git diff --exit-code
