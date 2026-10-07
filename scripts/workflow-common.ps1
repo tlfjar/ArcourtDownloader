@@ -47,12 +47,6 @@ function Assert-ReleaseSource([string]$Tag, [string]$Commit, $Main, [string]$Rep
     if ($LASTEXITCODE -ne 0) { throw 'Tag commit is outside protected main.' }
     return $identity
 }
-function Assert-SigningConfiguration {
-    $policy = Get-Content -LiteralPath (Join-Path $script:ReleaseRepo 'scripts/signing-policy.json') -Raw | ConvertFrom-Json
-    if ($policy.schemaVersion -ne 1 -or -not $policy.provider -or -not $policy.subject -or @($policy.certificateSha256).Count -eq 0) { throw 'Approved signing provider configuration is missing. See docs/releasing.md.' }
-    foreach ($hash in $policy.certificateSha256) { if ($hash -cnotmatch '^[0-9a-f]{64}$') { throw 'Invalid approved certificate fingerprint.' } }
-    return $policy
-}
 function Get-InputManifest([string]$Directory, $Identity, [string]$Repository, [string]$RunId, [string]$Attempt) {
     if ($Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' -or $RunId -notmatch '^[1-9][0-9]*$' -or $Attempt -notmatch '^[1-9][0-9]*$') { throw 'Invalid workflow identity.' }
     $files = [ordered]@{}
@@ -65,12 +59,18 @@ function Assert-InputManifest([string]$Directory, $Identity, [string]$Repository
     $actual = Get-Content -LiteralPath (Join-Path $Directory 'build-manifest.json') -Raw | ConvertFrom-Json -AsHashtable | ConvertTo-Json -Depth 10 -Compress
     if ($actual -cne $expected) { throw 'Unsigned input/build association mismatch.' }
 }
-function Assert-SignedAssociation([string]$Unsigned, [string]$Signed) {
-    foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) {
-        Assert-ApprovedSignature (Join-Path $Signed $name)
-        Push-Location $script:ReleaseRepo
-        try { Invoke-Native go @('run','-mod=readonly','./scripts/signing-tool',(Join-Path $Unsigned $name),(Join-Path $Signed $name)) } finally { Pop-Location }
-    }
+function Assert-CandidateBuildBinaries([string]$ZipPath, [string]$ManifestPath) {
+    $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+    $zip = [IO.Compression.ZipFile]::OpenRead($ZipPath)
+    try {
+        foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) {
+            $entry = $zip.GetEntry($name)
+            if ($null -eq $entry) { throw "Final ZIP is missing build executable: $name" }
+            $stream = $entry.Open()
+            try { $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream)).ToLowerInvariant() } finally { $stream.Dispose() }
+            if ($hash -cne $manifest.files.$name) { throw "Final ZIP executable differs from pinned build artifact: $name" }
+        }
+    } finally { $zip.Dispose() }
 }
 function Get-CandidateChecksums([string]$Assets, [string]$Tag) {
     $names = @("ArcourtDownloader-$Tag-windows-amd64.zip", "ArcourtDownloader-$Tag-SBOM.spdx.json")

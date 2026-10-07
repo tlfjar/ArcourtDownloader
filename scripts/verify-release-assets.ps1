@@ -1,9 +1,11 @@
 #requires -Version 7.4
-param([Parameter(Mandatory)][string]$AssetsPath, [Parameter(Mandatory)][string]$Tag, [switch]$Local)
+param([Parameter(Mandatory)][string]$AssetsPath, [Parameter(Mandatory)][string]$Tag, [switch]$Local, [switch]$UnsignedRelease)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'release-common.ps1')
 if ($env:OS -ne 'Windows_NT') { throw 'Authenticode verification requires Windows.' }
+if ($Local -eq $UnsignedRelease) { throw 'Choose exactly one verification mode: -Local or -UnsignedRelease.' }
 if ($Local -and $Tag -cne 'development') { throw 'Local verification only accepts the development tag.' }
+if ($UnsignedRelease -and $Tag -ceq 'development') { throw 'UnsignedRelease requires a tagged release.' }
 $assets = [IO.Path]::GetFullPath($AssetsPath).TrimEnd('\','/')
 $identity = if ($Local) { & (Join-Path $PSScriptRoot 'resolve-build-info.ps1') } else { & (Join-Path $PSScriptRoot 'resolve-build-info.ps1') -Release -Tag $Tag }
 $zipName = "ArcourtDownloader-$Tag-windows-amd64.zip"
@@ -34,9 +36,9 @@ try {
     if ((Get-SHA256 (Join-Path $extract 'SBOM.spdx.json')) -cne (Get-SHA256 (Join-Path $assets $sbomName))) { throw 'Internal/external SBOM mismatch.' }
     Push-Location (Join-Path $script:ReleaseRepo 'desktop/frontend')
     try { Invoke-Native node @('build.mjs') } finally { Pop-Location }
-    Assert-Payload $extract $identity -Local:$Local
-    if ($Local) { Write-Output 'Verified unsigned development assets; public signature readiness is not established.' }
-    else { Write-Output "Verified signed release assets for $Tag ($($identity.commit))." }
+    Assert-Payload $extract $identity
+    if ($Local) { Write-Output 'Verified unsigned development assets.' }
+    else { Write-Output "Verified intentionally unsigned release assets for $Tag ($($identity.commit))." }
 } finally {
     $resolved = [IO.Path]::GetFullPath($extract)
     if (-not $resolved.StartsWith($temporaryRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or (Split-Path -Leaf $resolved) -notlike 'arcourt-release-*') { throw 'Unsafe temporary cleanup path.' }

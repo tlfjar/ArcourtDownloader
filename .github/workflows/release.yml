@@ -1,4 +1,4 @@
-name: Signed draft release
+name: Unsigned draft release
 on:
   push:
     tags: ['v*']
@@ -35,7 +35,7 @@ jobs:
     permissions:
       contents: read
   build:
-    name: Production unsigned inputs
+    name: Production release binaries
     needs: [preflight, verify]
     runs-on: windows-2025
     timeout-minutes: 20
@@ -72,59 +72,9 @@ jobs:
           path: build/release-inputs/*
           if-no-files-found: error
           retention-days: 14
-  sign:
-    name: Approved provider signing
-    needs: [preflight, verify, build]
-    runs-on: windows-2025
-    timeout-minutes: 30
-    environment: release-signing
-    permissions:
-      contents: read
-      actions: read
-    # Integration adds ONLY the selected provider's environment secret/OIDC permission.
-    outputs:
-      artifact-id: ${{ steps.upload.outputs.artifact-id }}
-      artifact-digest: ${{ steps.upload.outputs.artifact-digest }}
-      attempt: ${{ steps.sign.outputs.attempt }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: '1.26.8'
-          cache: false
-      - name: Download exact build artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_ID: ${{ needs.build.outputs.artifact-id }}
-          INPUT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
-          BUILD_ATTEMPT: ${{ needs.build.outputs.attempt }}
-          GATE_RESULTS: ${{ toJSON(needs) }}
-        run: |
-          . ./scripts/workflow-common.ps1
-          Assert-ReleaseGates ($env:GATE_RESULTS | ConvertFrom-Json) @('preflight','verify','build')
-          ./scripts/release-preflight.ps1
-          ./scripts/get-workflow-artifact.ps1 -ArtifactId $env:INPUT_ID -Digest $env:INPUT_DIGEST -Name "unsigned-$env:GITHUB_RUN_ID-$env:BUILD_ATTEMPT" -Destination build/unsigned -Files @('ArcourtDownloader.exe','arcourt-download.exe','build-manifest.json')
-      - id: sign
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          INPUT_ID: ${{ needs.build.outputs.artifact-id }}
-          INPUT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
-          BUILD_ATTEMPT: ${{ needs.build.outputs.attempt }}
-        run: ./scripts/sign-release-inputs.ps1 -Tag $env:RELEASE_TAG -BuildAttempt $env:BUILD_ATTEMPT -ArtifactId $env:INPUT_ID -ArtifactDigest $env:INPUT_DIGEST
-      - id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: signed-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/signed/*
-          if-no-files-found: error
-          retention-days: 14
   package:
-    name: Verify signed inputs and package
-    needs: [build, sign]
+    name: Verify unsigned inputs and package
+    needs: [preflight, verify, build]
     runs-on: windows-2025
     timeout-minutes: 20
     permissions:
@@ -148,25 +98,19 @@ jobs:
         with:
           node-version: '24.12.0'
           package-manager-cache: false
-      - name: Download pinned inputs and outputs
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_ID: ${{ needs.build.outputs.artifact-id }}
-          INPUT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
-          BUILD_ATTEMPT: ${{ needs.build.outputs.attempt }}
-          SIGNED_ID: ${{ needs.sign.outputs.artifact-id }}
-          SIGNED_DIGEST: ${{ needs.sign.outputs.artifact-digest }}
-          SIGN_ATTEMPT: ${{ needs.sign.outputs.attempt }}
-        run: |
-          ./scripts/get-workflow-artifact.ps1 -ArtifactId $env:INPUT_ID -Digest $env:INPUT_DIGEST -Name "unsigned-$env:GITHUB_RUN_ID-$env:BUILD_ATTEMPT" -Destination build/unsigned -Files @('ArcourtDownloader.exe','arcourt-download.exe','build-manifest.json')
-          ./scripts/get-workflow-artifact.ps1 -ArtifactId $env:SIGNED_ID -Digest $env:SIGNED_DIGEST -Name "signed-$env:GITHUB_RUN_ID-$env:SIGN_ATTEMPT" -Destination build/signed -Files @('ArcourtDownloader.exe','arcourt-download.exe','signing-evidence.json')
       - id: package
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
           INPUT_ID: ${{ needs.build.outputs.artifact-id }}
           INPUT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
           BUILD_ATTEMPT: ${{ needs.build.outputs.attempt }}
-        run: ./scripts/package-release-inputs.ps1 -Tag $env:RELEASE_TAG -BuildAttempt $env:BUILD_ATTEMPT -ArtifactId $env:INPUT_ID -ArtifactDigest $env:INPUT_DIGEST
+          GATE_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          . ./scripts/workflow-common.ps1
+          Assert-ReleaseGates ($env:GATE_RESULTS | ConvertFrom-Json) @('preflight','verify','build')
+          ./scripts/release-preflight.ps1
+          ./scripts/package-release-inputs.ps1 -Tag $env:RELEASE_TAG -BuildAttempt $env:BUILD_ATTEMPT -ArtifactId $env:INPUT_ID -ArtifactDigest $env:INPUT_DIGEST
       - id: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

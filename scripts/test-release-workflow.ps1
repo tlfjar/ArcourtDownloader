@@ -17,7 +17,6 @@ function Save-JSON([string]$Path, $Value) { Write-Utf8 $Path (($Value | ConvertT
 $scratch = Join-Path $testRoot 'source'
 New-Item -ItemType Directory -Path (Join-Path $scratch 'scripts') -Force | Out-Null
 Write-Utf8 (Join-Path $scratch '.gitignore') "/build/`n"
-Save-JSON (Join-Path $scratch 'scripts/signing-policy.json') @{schemaVersion=1;provider='';subject='';certificateSha256=@()}
 Invoke-Native git @('-C',$scratch,'init','--quiet','--initial-branch=main')
 Invoke-Native git @('-C',$scratch,'add','.')
 Invoke-Native git @('-C',$scratch,'-c','user.name=Workflow Test','-c','user.email=workflow@example.invalid','-c','commit.gpgsign=false','commit','--quiet','-m','isolated test source')
@@ -48,9 +47,6 @@ foreach ($result in @('failure','cancelled','skipped','')) {
     Reject "source gate $result" { Assert-ReleaseGates @{verify=@{result=$result}} @('verify') } 'did not succeed'
 }
 Reject 'source gate missing' { Assert-ReleaseGates @{} @('verify') } 'did not succeed'
-$script:ReleaseRepo = $scratch
-try { Reject 'absent signing configuration' { Assert-SigningConfiguration } 'configuration is missing' }
-finally { $script:ReleaseRepo = $repo }
 Reject 'release fixture build' { & (Join-Path $PSScriptRoot 'build-desktop.ps1') -Release -Fixture -Tag $tag } 'Fixture desktop builds are forbidden'
 
 $inputs = New-BuildDirectory $repo ('tests/workflow-inputs-' + [Guid]::NewGuid().ToString('N'))
@@ -58,11 +54,17 @@ foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { Write-Utf
 $manifest = Get-InputManifest $inputs $identity 'test/repo' '12' '1'
 Save-JSON (Join-Path $inputs 'build-manifest.json') $manifest
 Assert-InputManifest $inputs $identity 'test/repo' '12' '1'
+$binaryZip = Join-Path $testRoot 'build-binaries.zip'
+[IO.Compression.ZipFile]::CreateFromDirectory($inputs,$binaryZip)
+Assert-CandidateBuildBinaries $binaryZip (Join-Path $inputs 'build-manifest.json')
 Reject 'wrong build run' { Assert-InputManifest $inputs $identity 'test/repo' '13' '1' } 'association mismatch'
 Write-Utf8 (Join-Path $inputs 'arcourt-download.exe') 'changed'
 Reject 'changed unsigned input' { Assert-InputManifest $inputs $identity 'test/repo' '12' '1' } 'association mismatch'
+$substitutedZip = Join-Path $testRoot 'substituted-binaries.zip'
+[IO.Compression.ZipFile]::CreateFromDirectory($inputs,$substitutedZip)
+Reject 'substituted final executable' { Assert-CandidateBuildBinaries $substitutedZip (Join-Path $inputs 'build-manifest.json') } 'differs from pinned build artifact'
 Write-Utf8 (Join-Path $inputs 'ArcourtDownloader-fixture.exe') 'fixture'
-Reject 'fixture in signing inputs' { Assert-InputManifest $inputs $identity 'test/repo' '12' '1' } 'unexpected payload files'
+Reject 'fixture in build inputs' { Assert-InputManifest $inputs $identity 'test/repo' '12' '1' } 'unexpected payload files'
 
 $assets = Join-Path $testRoot 'assets'
 New-Item -ItemType Directory -Path $assets | Out-Null
@@ -127,7 +129,7 @@ foreach ($name in $mockNames) { [IO.File]::WriteAllText((Join-Path $mockAssets $
 Write-Checksums $mockAssets $mockNames 'SHA256SUMS.txt'
 $mockHashes=Get-CandidateChecksums $mockAssets $mockTag
 $mockMarker=Get-CandidateMarker $mockTag $mockCommit $mockHashes
-$global:ArcourtWorkflowTestState=@{Release=$null;Writes=0;ApiFailure=$false;WrongTag=$false}
+$global:ArcourtWorkflowTestState=@{Release=$null;Writes=0;ApiFailure=$false;WrongTag=$false;AttestationCount=0}
 $global:ArcourtWorkflowTestState.Writes=0
 $global:ArcourtWorkflowTestState.ApiFailure=$false
 $global:ArcourtWorkflowTestState.WrongTag=$false
@@ -152,7 +154,12 @@ function gh {
             }
             throw 'Unexpected mocked GitHub API read'
         }
-        'attestation' { return }
+        'attestation' {
+            if ($arguments -cnotcontains '--source-digest' -or $arguments -cnotcontains $mockCommit -or $arguments -cnotcontains '--source-ref' -or $arguments -cnotcontains "refs/tags/$mockTag" -or $arguments -cnotcontains '--signer-workflow') { throw 'Unbound attestation verification' }
+            $global:ArcourtWorkflowTestState.AttestationCount++
+            if ($global:ArcourtWorkflowTestState.AttestationCount % 3 -eq 0 -and ($arguments -cnotcontains '--predicate-type' -or $arguments -cnotcontains 'https://spdx.dev/Document')) { throw 'Missing SPDX attestation verification' }
+            return
+        }
         'release' {
             $global:ArcourtWorkflowTestState.Writes++
             if ($arguments[1] -eq 'create') {
@@ -177,7 +184,8 @@ try {
     $env:GITHUB_SHA=$mockCommit; $env:GITHUB_REPOSITORY='test/repo'; $env:GITHUB_RUN_ID='12'; $env:RUNNER_TEMP=$testRoot; $env:GITHUB_STEP_SUMMARY=Join-Path $testRoot 'summary.txt'
     $entry=Join-Path $scratch 'scripts/stage-draft-release.ps1'
     & $entry -Tag $mockTag -AssetsPath $mockAssets
-    if ($global:ArcourtWorkflowTestState.Writes -ne 4 -or $global:ArcourtWorkflowTestState.Release.assets.Count -ne 3) { throw 'Initial draft did not create exactly three assets.' }
+    if ($global:ArcourtWorkflowTestState.Writes -ne 4 -or $global:ArcourtWorkflowTestState.Release.assets.Count -ne 3 -or $global:ArcourtWorkflowTestState.AttestationCount -ne 3) { throw 'Initial draft did not verify provenance and create exactly three assets.' }
+    if ($global:ArcourtWorkflowTestState.Release.body -notmatch 'Unsigned release candidate|intentionally unsigned' -or $global:ArcourtWorkflowTestState.Release.body -match 'signing evidence|certificate') { throw 'Draft notes did not state unsigned policy.' }
     $global:ArcourtWorkflowTestState.Writes=0
     & $entry -Tag $mockTag -AssetsPath $mockAssets
     if ($global:ArcourtWorkflowTestState.Writes -ne 0) { throw 'Identical draft rerun wrote remote state.' }
@@ -215,6 +223,10 @@ foreach ($path in (Get-ChildItem -LiteralPath (Join-Path $repo '.github/workflow
 $releaseYaml = Get-Content -LiteralPath (Join-Path $repo '.github/workflows/release.yml') -Raw
 if ($releaseYaml -match 'workflow_dispatch|pull_request|continue-on-error|secrets: inherit' -or $releaseYaml -notmatch "tags: \['v\*'\]" -or $releaseYaml -notmatch 'cancel-in-progress: false') { throw 'Unsafe release trigger/concurrency/fallback.' }
 if ([regex]::Matches($releaseYaml,'contents: write').Count -ne 1 -or [regex]::Matches($releaseYaml,'id-token: write').Count -ne 1) { throw 'Unexpected release privilege scope.' }
+if ($releaseYaml -match '(?m)^  sign:|^\s+environment:|release-signing|needs\.sign|sign-release-inputs|signing-policy|\$\{\{\s*secrets\.' ) { throw 'Signing provider or environment remains in release workflow.' }
+if ($releaseYaml -notmatch 'needs: \[preflight, verify, build\]' -or $releaseYaml -notmatch 'INPUT_ID: \$\{\{ needs\.build\.outputs\.artifact-id \}\}' -or $releaseYaml -notmatch 'INPUT_DIGEST: \$\{\{ needs\.build\.outputs\.artifact-digest \}\}' -or $releaseYaml -notmatch 'BUILD_ATTEMPT: \$\{\{ needs\.build\.outputs\.attempt \}\}' -or $releaseYaml -notmatch 'package-release-inputs.ps1' ) { throw 'Package job is not bound to exact build artifact and source gates.' }
+if ($releaseYaml -notmatch 'actions/attest-build-provenance@' -or $releaseYaml -notmatch 'actions/attest-sbom@' -or $releaseYaml -notmatch 'build/candidate/\*\.zip' -or $releaseYaml -notmatch 'build/candidate/\*\.spdx\.json') { throw 'Final ZIP and SBOM provenance is not mandatory.' }
+if ($releaseYaml -match "release','edit|--draft=false|--clobber") { throw 'Release workflow can publish or replace assets.' }
 $draftScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stage-draft-release.ps1') -Raw
 if ($draftScript -notmatch "'--draft','--verify-tag'" -or $draftScript -match "'--clobber'|'--draft=false'") { throw 'Unsafe draft create/upload contract.' }
-Write-Host "Release workflow rehearsals passed; no real tag, signing request, release or remote setting was created. Evidence: $testRoot"
+Write-Host "Release workflow rehearsals passed; no real tag, release or remote setting was created. Evidence: $testRoot"

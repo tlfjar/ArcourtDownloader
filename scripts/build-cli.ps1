@@ -1,15 +1,17 @@
 param([switch]$Release, [string]$Tag, [string]$Version, [string]$OutputPath)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
+if ($Release) { . (Join-Path $PSScriptRoot 'release-common.ps1') }
 $repo = Split-Path -Parent $PSScriptRoot
 $identity = & (Join-Path $PSScriptRoot 'resolve-build-info.ps1') -Release:$Release -Tag $Tag -Version $Version
 $previousWork = $env:GOWORK
 $previousCGO = $env:CGO_ENABLED
 $previousOS = $env:GOOS
 $previousArch = $env:GOARCH
+$previousToolchain = $env:GOTOOLCHAIN
 try {
     $env:GOWORK = 'off'
-    if ($Release) { $env:CGO_ENABLED = '0'; $env:GOOS = 'windows'; $env:GOARCH = 'amd64' }
+    if ($Release) { $env:CGO_ENABLED = '0'; $env:GOOS = 'windows'; $env:GOARCH = 'amd64'; $env:GOTOOLCHAIN = Get-ReviewedGoToolchain }
     if (-not $OutputPath) {
         $bin = New-BuildDirectory $repo 'bin'
         $OutputPath = Join-Path $bin 'arcourt-download.exe'
@@ -19,5 +21,5 @@ try {
     Push-Location $repo
     try { Invoke-Native go @('build', '-mod=readonly', '-trimpath', '-ldflags', $flags, '-o', $OutputPath, './cmd/arcourt-download') }
     finally { Pop-Location }
-} finally { $env:GOWORK = $previousWork; $env:CGO_ENABLED = $previousCGO; $env:GOOS = $previousOS; $env:GOARCH = $previousArch }
+} finally { $env:GOWORK = $previousWork; $env:CGO_ENABLED = $previousCGO; $env:GOOS = $previousOS; $env:GOARCH = $previousArch; $env:GOTOOLCHAIN = $previousToolchain }
 Write-Output $identity

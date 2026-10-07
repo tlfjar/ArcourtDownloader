@@ -15,11 +15,14 @@ Use a writable local NTFS output folder. End users do not need Go or Node.
 
 ## Download or build
 
-No published release or signed candidate is established yet. The planned download
-location is [GitHub Releases](https://github.com/tlfjar/ArcourtDownloader/releases).
-When a reviewed portable ZIP is available, extract it to a local folder and launch
-`ArcourtDownloader.exe`; the CLI is `arcourt-download.exe`. There is no installer
-or automatic updater. Current source builds are unsigned development artifacts.
+Download only from the [official GitHub Releases page](https://github.com/tlfjar/ArcourtDownloader/releases).
+Public Windows release executables are intentionally unsigned. Microsoft Defender
+SmartScreen or other Windows protections may warn about them. Releases provide
+SHA-256 checksums and GitHub artifact attestations for source/build provenance;
+these do not establish an Authenticode publisher identity. Signing may be added
+later, but it is not required for release. When a reviewed portable ZIP is
+available, extract it to a local folder and launch `ArcourtDownloader.exe`;
+the CLI is `arcourt-download.exe`. There is no installer or automatic updater.
 
 Install [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 for the UI and Edge or Chrome separately. Source builds use Git, Go 1.26.8,
@@ -40,7 +43,7 @@ Initial tool/module downloads need internet access. If execution policy blocks a
 script, use a process-local invocation such as
 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check.ps1`.
 See [testing](docs/testing.md) for checks and [releasing](docs/releasing.md) for
-local unsigned packaging and the remaining distribution gates. A human production
+the unsigned release procedure. A human production
 GUI walkthrough remains pending; [past live evidence](docs/verification.md) is
 limited to its recorded date and scope.
 

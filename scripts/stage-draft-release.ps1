@@ -48,10 +48,10 @@ Invoke-Native gh @('attestation','verify',(Join-Path $AssetsPath "ArcourtDownloa
 if ($null -eq $release) {
     $notesPath = Join-Path $env:RUNNER_TEMP 'arcourt-draft-notes.md'
     $notes = @(
-        "Candidate $Tag; source $($identity.commit).",
-        "", "Build, signing evidence and provenance: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID",
+        "Unsigned release candidate $Tag; source $($identity.commit). Both Windows executables are intentionally unsigned and may trigger Microsoft Defender SmartScreen or other Windows warnings.",
+        "", "Build and GitHub provenance: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID",
         "", 'Production GUI walkthrough, live compatibility, fresh-download inspection and operator publication approval: pending. Automated fixtures do not establish live compatibility.',
-        "", 'Inspect the three assets, signer, source and attestations using docs/releasing.md before publication.',
+        "", 'Inspect the three assets, SHA-256 checksums, source and GitHub attestations using docs/releasing.md before publication. Provenance is not an Authenticode publisher identity.',
         "", $marker, ""
     ) -join "`n"
     Write-Utf8 $notesPath $notes

@@ -10,8 +10,13 @@ New-Item -ItemType Directory -Path $directory | Out-Null
 Copy-Item -LiteralPath (Join-Path $script:ReleaseRepo 'desktop/build/bin/ArcourtDownloader.exe') -Destination $directory
 & (Join-Path $PSScriptRoot 'build-cli.ps1') -Release -Tag $Tag -OutputPath (Join-Path $directory 'arcourt-download.exe') | Out-Null
 & (Join-Path $PSScriptRoot 'generate-notices.ps1') -Check
+$previousToolchain = $env:GOTOOLCHAIN
 Push-Location $script:ReleaseRepo
-try { Invoke-Native go @('run','-mod=readonly','./scripts/release-tool','-mode','inspect','-binaries',$directory,'-version',$identity.version,'-commit',$identity.commit,'-release','true') } finally { Pop-Location }
+try {
+    $env:GOTOOLCHAIN = Get-ReviewedGoToolchain
+    Invoke-Native go @('run','-mod=readonly','./scripts/release-tool','-mode','inspect','-binaries',$directory,'-version',$identity.version,'-commit',$identity.commit,'-release','true')
+} finally { Pop-Location; $env:GOTOOLCHAIN = $previousToolchain }
+foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { Assert-UnsignedExecutable (Join-Path $directory $name) }
 $manifest = Get-InputManifest $directory $identity $env:GITHUB_REPOSITORY $env:GITHUB_RUN_ID $env:GITHUB_RUN_ATTEMPT
 Write-Utf8 (Join-Path $directory 'build-manifest.json') (($manifest | ConvertTo-Json -Depth 10) + "`n")
 & (Join-Path $PSScriptRoot 'resolve-build-info.ps1') -Release -Tag $Tag | Out-Null
