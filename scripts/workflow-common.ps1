@@ -6,8 +6,14 @@ function Get-GitHubJson([string]$Endpoint) {
     if ($LASTEXITCODE -ne 0) { throw "GitHub read failed: $Endpoint" }
     return ($json | ConvertFrom-Json)
 }
-function Receive-GitHubFile([string]$Endpoint, [string]$Path) {
+function Receive-GitHubActionsArtifactArchive([string]$Endpoint, [string]$Path) {
     # PowerShell 7.4+ preserves native stdout bytes, including binary ZIP/EXE data.
+    # gh api follows the Actions archive endpoint's redirect to the ZIP.
+    & gh api $Endpoint -H 'Accept: application/vnd.github+json' > $Path
+    if ($LASTEXITCODE -ne 0) { throw 'GitHub Actions artifact download failed.' }
+}
+function Receive-GitHubReleaseAsset([string]$Endpoint, [string]$Path) {
+    # Release assets use a separate binary-response media type.
     & gh api $Endpoint -H 'Accept: application/octet-stream' > $Path
     if ($LASTEXITCODE -ne 0) { throw 'GitHub asset download failed.' }
 }

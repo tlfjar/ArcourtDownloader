@@ -15,6 +15,6 @@ Assert-OrdinaryPath $destinationPath
 if (Test-Path -LiteralPath $destinationPath) { throw 'Artifact destination must be new.' }
 $archive = Join-Path ([IO.Path]::GetTempPath()) ('arcourt-artifact-' + [Guid]::NewGuid().ToString('N') + '.zip')
 try {
-    Receive-GitHubFile "repos/$env:GITHUB_REPOSITORY/actions/artifacts/$ArtifactId/zip" $archive
+    Receive-GitHubActionsArtifactArchive "repos/$env:GITHUB_REPOSITORY/actions/artifacts/$ArtifactId/zip" $archive
     Expand-WorkflowArtifact $archive $Digest $destinationPath $Files
 } finally { if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive } }

@@ -95,6 +95,11 @@ $archive = Join-Path $testRoot 'artifact.zip'
 $digest = Get-SHA256 $archive
 $metadata = [pscustomobject]@{id=42;name='candidate-12-1';expired=$false;digest="sha256:$digest";workflow_run=@{id=12;head_sha=$commit}}
 Assert-WorkflowArtifact $metadata '42' $digest 'candidate-12-1' '12' $commit
+Reject 'wrong artifact ID' { Assert-WorkflowArtifact $metadata '43' $digest 'candidate-12-1' '12' $commit } 'association mismatch'
+Reject 'wrong artifact name' { Assert-WorkflowArtifact $metadata '42' $digest 'other' '12' $commit } 'association mismatch'
+$metadata.expired=$true
+Reject 'expired artifact' { Assert-WorkflowArtifact $metadata '42' $digest 'candidate-12-1' '12' $commit } 'association mismatch'
+$metadata.expired=$false
 Reject 'artifact from another run' { Assert-WorkflowArtifact $metadata '42' $digest 'candidate-12-1' '13' $commit } 'association mismatch'
 Reject 'artifact from another commit' { Assert-WorkflowArtifact $metadata '42' $digest 'candidate-12-1' '12' ('0'*40) } 'association mismatch'
 Reject 'artifact metadata digest' { Assert-WorkflowArtifact $metadata '42' ('0'*64) 'candidate-12-1' '12' $commit } 'association mismatch'
@@ -114,7 +119,7 @@ foreach ($file in @('stage-draft-release.ps1','workflow-common.ps1','release-com
 # function cannot emulate native byte-stream redirection used by the real gh CLI.
 $mockBoundary = @'
 
-function Receive-GitHubFile([string]$Endpoint, [string]$Path) { Mock-Download $Endpoint $Path }
+function Receive-GitHubReleaseAsset([string]$Endpoint, [string]$Path) { Mock-Download $Endpoint $Path }
 '@
 Add-Content -LiteralPath (Join-Path $scratch 'scripts/workflow-common.ps1') -Value $mockBoundary
 Invoke-Native git @('-C',$scratch,'add','.')
@@ -211,6 +216,13 @@ try {
 }
 
 # Verify checked-in workflow contracts. actionlint performs full YAML/schema checks.
+$artifactDownload = (Get-Command Receive-GitHubActionsArtifactArchive).ScriptBlock.ToString()
+$assetDownload = (Get-Command Receive-GitHubReleaseAsset).ScriptBlock.ToString()
+if ($artifactDownload -cnotmatch "& gh api \`$Endpoint -H 'Accept: application/vnd.github\+json' > \`$Path" -or $artifactDownload -cnotmatch '\$LASTEXITCODE -ne 0' -or $artifactDownload -match 'application/octet-stream') { throw 'Actions artifact download API contract changed.' }
+if ($assetDownload -cnotmatch "& gh api \`$Endpoint -H 'Accept: application/octet-stream' > \`$Path" -or $assetDownload -cnotmatch '\$LASTEXITCODE -ne 0' -or $assetDownload -match 'application/vnd.github\+json') { throw 'Release asset download API contract changed.' }
+$artifactScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'get-workflow-artifact.ps1') -Raw
+$draftScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stage-draft-release.ps1') -Raw
+if ($artifactScript -notmatch 'Receive-GitHubActionsArtifactArchive "repos/\$env:GITHUB_REPOSITORY/actions/artifacts/\$ArtifactId/zip" \$archive' -or $artifactScript -match 'Receive-GitHubReleaseAsset|Receive-GitHubFile' -or $draftScript -notmatch 'Receive-GitHubReleaseAsset "repos/\$env:GITHUB_REPOSITORY/releases/assets/\$\(\$asset.id\)" \$file' -or $draftScript -match 'Receive-GitHubActionsArtifactArchive|Receive-GitHubFile') { throw 'Artifact and release asset download callers were mixed.' }
 foreach ($path in (Get-ChildItem -LiteralPath (Join-Path $repo '.github/workflows') -Filter '*.yml')) {
     $yaml = Get-Content -LiteralPath $path.FullName -Raw
     foreach ($match in [regex]::Matches($yaml, '(?m)^\s+(?:- )?uses:\s+(\S+)')) {
