@@ -31,7 +31,7 @@ function Assert-ExistingAssets($Release) {
         # Verify actual remote bytes as well as any digest supplied by the API.
         $file = Join-Path $env:RUNNER_TEMP ('arcourt-remote-' + [Guid]::NewGuid().ToString('N'))
         try {
-            Receive-GitHubFile "repos/$env:GITHUB_REPOSITORY/releases/assets/$($asset.id)" $file
+            Receive-GitHubReleaseAsset "repos/$env:GITHUB_REPOSITORY/releases/assets/$($asset.id)" $file
             if ((Get-SHA256 $file) -cne $hashes[$asset.name]) { throw 'Existing draft asset bytes differ from this candidate.' }
         } finally { if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file } }
     }
