@@ -30,6 +30,7 @@ type DownloadRequest struct {
 	Selection       []DocketEntry
 	SkipSourceURLs  []string
 	OutputDirectory string
+	Naming          *NamingRequest
 }
 
 // DocumentID hashes the canonical source identity. URLs, including unknown query
@@ -52,6 +53,7 @@ type LocalDocumentResult struct {
 	Status      DocumentStatus `json:"outcome"`
 	SkipReason  string         `json:"skip_reason,omitempty"`
 	Saved       bool           `json:"saved"`
+	Naming      *NamingOutcome `json:"naming,omitempty"`
 	Error       string         `json:"error,omitempty"`
 	Err         error          `json:"-"`
 }

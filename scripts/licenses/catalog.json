@@ -89,6 +89,30 @@
       ]
     },
     {
+      "Name": "github.com/giraffesyo/pdf",
+      "Version": "v0.7.0",
+      "License": "MIT AND BSD-3-Clause",
+      "Source": "https://github.com/giraffesyo/pdf/tree/v0.7.0",
+      "Sum": "h1:/Iydu6KpVWDbDVXxtHSSDqAVKPSq2Ohskh6qPZhClkI=",
+      "Materials": [
+        {
+          "Path": "LICENSE",
+          "SHA256": "2330b0fb5bc584a1bc43695ca70b131912e3c76af5cd185682b22e93557d2933",
+          "Text": "MIT License\n\nCopyright (c) 2026 Michael McQuade (@giraffesyo)\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        },
+        {
+          "Path": "internal/encoding/glyphlist.go",
+          "SHA256": "699746e6c4a5a444f0917c96049ac3146d3aaf174fe8306c621402edd99bf166",
+          "Text": "// This file embeds the Adobe Glyph List (glyphlist.txt, table version\n// 2.0), https://github.com/adobe-type-tools/agl-aglfn:\n//\n// Copyright 2002-2019 Adobe (http://www.adobe.com/). Redistribution and\n// use in source and binary forms, with or without modification, are\n// permitted provided that redistributions of source code retain the\n// above copyright notice and this list of conditions, and that neither\n// the name of Adobe nor the names of its contributors be used to endorse\n// or promote products derived from this software without specific prior\n// written permission. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS\n// AND CONTRIBUTORS \"AS IS\" WITHOUT WARRANTIES OF ANY KIND.\n\n"
+        },
+        {
+          "Path": "https://raw.githubusercontent.com/adobe-type-tools/agl-aglfn/master/LICENSE.md",
+          "SHA256": "58147d341e7a34aa2196862395a34d2fd95716c41d5ed26efb59ab0e12f92089",
+          "Text": "Redistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are\nmet:\n\nRedistributions of source code must retain the above copyright notice,\nthis list of conditions and the following disclaimer.\n\nRedistributions in binary form must reproduce the above copyright\nnotice, this list of conditions and the following disclaimer in the\ndocumentation and/or other materials provided with the distribution.\n\nNeither the name of Adobe nor the names of its contributors may be\nused to endorse or promote products derived from this software without\nspecific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT\nLIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR\nA PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT\nHOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,\nSPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT\nLIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\nDATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\nTHEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+        }
+      ]
+    },
+    {
       "Name": "github.com/go-json-experiment/json",
       "Version": "v0.0.0-20260214004413-d219187c3433",
       "License": "BSD-3-Clause",
@@ -443,6 +467,20 @@
           "Path": "pkg/assetserver/ringqueue.go",
           "SHA256": "97c20f17b253a0e00ceff8154aa9757057dcefb823cd8deaba63f28aa7691528",
           "Text": "/*\nThe MIT License (MIT)\n\nCopyright (c) 2015 Erik Dubbelboer\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n*/"
+        }
+      ]
+    },
+    {
+      "Name": "github.com/zendev-sh/goai",
+      "Version": "v0.10.6",
+      "License": "MIT",
+      "Source": "https://github.com/zendev-sh/goai/tree/v0.10.6",
+      "Sum": "h1:Sz/DioCZPIaiaEXTqKh7Xl/lU40VHFq9B2hPgldIqxE=",
+      "Materials": [
+        {
+          "Path": "LICENSE",
+          "SHA256": "f95fef07dc506b207f48c5124c044b8752b43b62d27b5bc4316ae26376137511",
+          "Text": "MIT License\n\nCopyright (c) 2026 GoAI\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
         }
       ]
     },

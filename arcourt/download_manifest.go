@@ -18,6 +18,7 @@ const maxManifestBytes = 8 << 20
 
 var receiptPattern = regexp.MustCompile(`^\.arcourt-receipt-[a-f0-9]{32}\.json$`)
 var pdfTempPattern = regexp.MustCompile(`^\.arcourt-pdf-[a-f0-9]{32}\.tmp$`)
+var namingStrategyPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 
 type downloadStore struct {
 	disk         downloadDisk
@@ -67,6 +68,9 @@ func validRecord(r LocalDocumentResult) bool {
 	if !validDigest(r.DocumentID) || r.Timestamp.IsZero() {
 		return false
 	}
+	if !validNamingOutcome(r.Naming) {
+		return false
+	}
 	switch r.Status {
 	case DocumentSucceeded, DocumentFailed, DocumentUnavailable, DocumentSkipped, DocumentCanceled:
 	default:
@@ -79,6 +83,36 @@ func validRecord(r LocalDocumentResult) bool {
 		return r.Filename != "" && r.Size >= 8 && validDigest(r.SHA256)
 	}
 	return r.Status != DocumentSucceeded && r.Filename == "" && r.Size == 0 && r.SHA256 == ""
+}
+
+func validNamingOutcome(n *NamingOutcome) bool {
+	if n == nil {
+		return true // Manifest/receipt version 1 records predate optional naming.
+	}
+	// Strategy is persisted provenance, not a parser instruction. A later
+	// naming strategy must not make an older version-1 manifest unreadable.
+	if !namingStrategyPattern.MatchString(n.Strategy) || n.Calls < 0 || n.Calls > maxNamingCalls {
+		return false
+	}
+	if n.Usage != nil {
+		u := n.Usage
+		if n.Calls == 0 || u.RequestBytes < 0 || u.RequestBytes > 1<<20 || u.InputTokenEstimate < 0 || u.InputTokenEstimate > 1<<20 || u.InputTokens < 0 || u.OutputTokens < 0 || u.CacheReadTokens < 0 || u.CacheWriteTokens < 0 || u.ReasoningTokens < 0 {
+			return false
+		}
+	}
+	if n.Source == "ai" {
+		label, reason := normalizeNamingLabel(n.Label, n.Label)
+		return n.Calls > 0 && n.Reason == "" && reason == "" && label == n.Label
+	}
+	if n.Source != "deterministic" || n.Label != "" {
+		return false
+	}
+	switch n.Reason {
+	case "configuration", "provider_auth", "provider_model", "provider_refusal", "rate_limited", "provider_error", "payload_limit", "unsafe_result", "unsupported_result", "length_exhaustion", "insufficient_context", "too_large", "encrypted", "image_only", "unreadable", "timeout", "canceled":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *downloadStore) load(caseNumber string) error {
