@@ -81,10 +81,20 @@ End users need neither Go nor Node.
    folder** opens the case subdirectory after a run. The shared service owns PDFs,
    the manifest, verified repeat skips, destination restrictions, and recovery.
 
+Optional naming is configured in the same Settings panel. Select a provider and
+model, review and consent to its direct recipient and bounded text disclosure,
+then save or replace that provider's API key through the separate credential
+action. The form reports only configured/missing/unavailable key status. The
+setting is off by default, and a missing key or consent keeps the normal filename
+without preventing download. Per-document results distinguish accepted AI labels
+from controlled deterministic fallbacks. See [AI document naming](ai-document-naming.md).
+
 Defaults: sequential downloads, at most 200 discovered documents, the core's
 PDF/HTTP/retry limits, 90-second page timeout, and a 30-minute operation deadline.
-The CLI offers advanced overrides. There are no accounts, telemetry, cloud
-backend, OCR, AI processing, or automatic application updates.
+The CLI offers advanced overrides. There are no accounts, telemetry, application
+cloud backend, OCR, or automatic application updates. Optional AI naming sends
+bounded text directly to the selected provider after downloaded PDF bytes pass
+the independent local validation step.
 
 ## State, settings, and shutdown
 
@@ -116,8 +126,12 @@ termination and power loss cannot run orderly cleanup.
 
 Preferences use `os.UserConfigDir()`:
 `%APPDATA%\ArcourtDownloader\settings.json`. They contain output preference,
-browser override, and configured public case template. Writes use a sibling
-temporary file followed by rename. Corrupt/inaccessible settings show a diagnostic.
+browser override, configured public case template, and non-secret AI naming
+choices/recipient consent. API keys live in per-provider generic credentials in
+the current Windows user's Credential Manager and are never returned by normal
+snapshots. Credential Manager failure disables AI naming rather than storing a
+plaintext key. Settings writes use a sibling temporary file followed by rename.
+Corrupt/inaccessible settings show a diagnostic.
 WebView2 shell data uses `%LOCALAPPDATA%\ArcourtDownloader\WebView2`.
 Automation uses the core's separate temporary profiles and never attaches to
 personal browser sessions. The app does not modify browser installations or the
@@ -141,8 +155,9 @@ Run the opt-in **actual Windows GUI** fixture workflow:
 ```
 
 This visibly opens `ArcourtDownloader-fixture.exe` on the current Windows desktop.
-It requires installed Edge (or adjusting the browser-name assertion for Chrome),
-WebView2, and an interactive English Windows session for native dialogs. It creates
+It requires installed Edge or Chrome (select Chrome with the test-only
+`ARCOURT_BROWSER_EXECUTABLE` environment variable), WebView2, and an
+interactive English Windows session for native dialogs. It creates
 only synthetic cases/PDFs and temporary settings/output. Production excludes its
 loopback fixture server, DNS/dial seams, and authenticated test-control endpoint.
 Test control uses Wails' normal script executor to drive the real DOM and bindings;

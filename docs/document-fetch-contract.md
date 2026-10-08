@@ -6,6 +6,10 @@ both and owns installed-browser sessions; call `Close()` at application shutdown
 The [shared filesystem download service](filesystem-download-service.md) wraps
 this contract. The [CLI](command-line-workflow.md) and
 [Windows desktop GUI](desktop-architecture.md) both use that service.
+Optional AI document naming runs in the shared Go service only after a selected
+PDF has been downloaded and independently checked. It uses a separate provider
+transport and never inherits the fetcher's court cookies, request URL, or HTTP
+client. See the [AI naming guide](ai-document-naming.md).
 
 ## Identity and discovery
 

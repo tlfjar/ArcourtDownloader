@@ -7,7 +7,9 @@ It does not provide official notice or guarantee a complete court record.
 
 The app saves the PDFs you select, plus a local download manifest, on your
 computer. It has no account, application server, telemetry, or cloud storage.
-Requests go directly to the public site you configure.
+Court requests go directly to the public site you configure. Optional AI naming,
+off by default, sends a bounded text excerpt from a selected PDF directly to the
+provider you choose.
 
 ## Get started
 
@@ -48,6 +50,24 @@ site uses pagination or virtualized rows, a Select All result is marked partial.
 The [desktop guide](docs/desktop-architecture.md#runtime-and-workflow) explains
 settings and behavior in more detail.
 
+### Optional AI document names
+
+In **Settings & diagnostics**, enable AI naming, choose OpenAI, xAI, Anthropic,
+or Google, enter a model ID available to your account, review the recipient and
+disclosure, and save the settings. Then save the selected provider's API key in
+Windows Credential Manager using the separate **Save or replace key** action.
+You can remove it there later. The app shows whether a key is configured but
+never displays a stored key.
+
+For newly downloaded, complete PDFs, the Go core inspects at most the first two
+pages locally and sends only a small title-centered text excerpt. It may make one
+bounded expansion if the first excerpt is insufficient. It does not upload the
+PDF or send source URLs. The excerpt can still contain sensitive material, and
+provider API charges may apply. Image-only, unreadable, ambiguous, or failed
+naming uses the normal deterministic filename; the PDF still saves. Already
+verified downloads do not incur another naming call. See the [AI naming guide](docs/ai-document-naming.md)
+for limits, privacy boundaries, fallbacks, and evidence status.
+
 ## Use the command line
 
 The included `arcourt-download.exe` can preview a case, then download specific
@@ -71,6 +91,8 @@ uses a separate temporary browser profile and does not use your browser cookies
 or accounts. Normal shutdown removes that temporary profile. The
 [download service guide](docs/filesystem-download-service.md) explains file
 naming, repeat downloads, manifests, and recovery.
+AI API keys are stored separately in the current Windows user's Credential
+Manager; settings and manifests contain no key, excerpt, or raw provider reply.
 
 ## Troubleshooting
 
@@ -81,6 +103,7 @@ naming, repeat downloads, manifests, and recovery.
 | Preview is empty or shows the wrong case | Check the URL template and case number. Do not download a mismatched case. |
 | Output folder fails | Choose an existing, writable local NTFS folder. Avoid shares, junctions, and files open in another app. |
 | Some documents did not download | Check the per-document result and discovery warnings, then retry eligible items. |
+| AI naming used a standard filename | Check provider, model, consent and key status in Settings. Image-only or unclear PDFs also use standard names. The PDF may still have saved successfully. |
 | A record requires authentication or shows CAPTCHA | Use the site's authorized workflow; this app does not bypass access controls or import credentials. |
 
 Successful downloads do not prove that the court has no other records. For

@@ -28,8 +28,12 @@ automated tests or CI.
 
 Preserve explicit preview and selection, sequential bounded downloads, partial
 results, local manifests, and isolated owned browser processes. Keep network/file
-logic in the Go core and the desktop UI thin. The product has no server, telemetry,
-cloud storage, OCR, AI processing, updater, or installer requirement.
+logic in the Go core and the desktop UI thin. Optional document naming sends a
+bounded excerpt to the consented provider; ordinary downloads remain AI-free.
+The product has no server, telemetry, cloud storage, OCR, updater, or installer
+requirement. Use only synthetic PDFs and mock provider transports in automated
+tests. Live provider benchmarks require explicit spending authorization and a
+finite budget; a credential in the environment is not permission.
 
 Public issues and pull requests must exclude court PDFs, client documents,
 credentials, signed URLs, browser profiles, and unredacted client screenshots.

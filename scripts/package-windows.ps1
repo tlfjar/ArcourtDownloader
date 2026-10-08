@@ -46,7 +46,7 @@ try {
         if ($cliIdentity.commit -cne $identity.commit) { throw 'Source changed during local build.' }
     }
     New-Item -ItemType Directory -Path (Join-Path $stage 'docs') | Out-Null
-    foreach ($name in @('LICENSE','THIRD_PARTY_NOTICES.txt','README.md','SUPPORT.md','SECURITY.md','docs/command-line-workflow.md','docs/releasing.md')) {
+    foreach ($name in @('LICENSE','THIRD_PARTY_NOTICES.txt','README.md','SUPPORT.md','SECURITY.md','docs/ai-connector-evaluation.md','docs/ai-document-naming.md','docs/command-line-workflow.md','docs/releasing.md')) {
         Write-Utf8 (Join-Path $stage $name) ([IO.File]::ReadAllText((Join-Path $repo $name)))
     }
     Write-Utf8 (Join-Path $stage 'BUILD.json') (($identity | ConvertTo-Json) + "`n")
