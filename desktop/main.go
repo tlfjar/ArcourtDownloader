@@ -28,16 +28,22 @@ type Desktop struct {
 	mayClose   atomic.Bool
 }
 
-func (d *Desktop) Snapshot() app.State     { return d.controller.Snapshot() }
+func (d *Desktop) Snapshot() app.State       { return d.controller.Snapshot() }
 func (d *Desktop) BuildInfo() buildinfo.Info { return buildinfo.Current() }
-func (d *Desktop) SetCase(s string) error  { return d.controller.SetCase(s) }
-func (d *Desktop) PreviewCase() error      { return d.controller.PreviewCase() }
-func (d *Desktop) Download(g uint64) error { return d.controller.Download(g) }
-func (d *Desktop) Cancel()                 { d.controller.Cancel() }
+func (d *Desktop) SetCase(s string) error    { return d.controller.SetCase(s) }
+func (d *Desktop) PreviewCase() error        { return d.controller.PreviewCase() }
+func (d *Desktop) Download(g uint64) error   { return d.controller.Download(g) }
+func (d *Desktop) Cancel()                   { d.controller.Cancel() }
 func (d *Desktop) SetSelection(g uint64, ids []string, verified, all bool) error {
 	return d.controller.SetSelection(g, ids, verified, all)
 }
 func (d *Desktop) SavePreferences(p app.Preferences) error { return d.controller.SavePreferences(p) }
+func (d *Desktop) SaveNamingCredential(provider, key string) error {
+	return d.controller.SaveNamingCredential(provider, key)
+}
+func (d *Desktop) RemoveNamingCredential(provider string) error {
+	return d.controller.RemoveNamingCredential(provider)
+}
 
 func (d *Desktop) ChooseFolder() (string, error) {
 	s := d.Snapshot()

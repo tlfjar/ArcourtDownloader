@@ -20,3 +20,10 @@ export function totals(c) {
 }
 
 export function doneCount(c) { return c.Succeeded + c.Skipped + c.Failed + c.Unavailable + c.Canceled; }
+
+export function namingDetail(n) {
+  if (!n) return '';
+  if (n.source === 'ai' && n.label) return `AI label: ${n.label}`;
+  if (n.source === 'deterministic') return n.reason ? `Standard filename (${n.reason.replaceAll('_', ' ')})` : 'Standard filename';
+  return 'Standard filename';
+}

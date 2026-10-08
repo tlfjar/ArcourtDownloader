@@ -37,37 +37,46 @@ type Result struct {
 }
 
 type ResultDocument struct {
-	DocumentID  string `json:"document_id"`
-	Description string `json:"description"`
-	FilingDate  string `json:"filing_date"`
-	Filename    string `json:"filename"`
-	SHA256      string `json:"sha256"`
-	Size        int64  `json:"size"`
-	Status      string `json:"outcome"`
-	SkipReason  string `json:"skip_reason"`
-	Saved       bool   `json:"saved"`
-	Error       string `json:"error"`
+	DocumentID  string        `json:"document_id"`
+	Description string        `json:"description"`
+	FilingDate  string        `json:"filing_date"`
+	Filename    string        `json:"filename"`
+	SHA256      string        `json:"sha256"`
+	Size        int64         `json:"size"`
+	Status      string        `json:"outcome"`
+	SkipReason  string        `json:"skip_reason"`
+	Saved       bool          `json:"saved"`
+	Error       string        `json:"error"`
+	Naming      *NamingResult `json:"naming,omitempty"`
+}
+
+type NamingResult struct {
+	Source string `json:"source"`
+	Label  string `json:"label"`
+	Reason string `json:"reason"`
 }
 
 type State struct {
-	Revision    uint64                 `json:"revision"`
-	Generation  uint64                 `json:"generation"`
-	CaseNumber  string                 `json:"caseNumber"`
-	Busy        bool                   `json:"busy"`
-	Canceling   bool                   `json:"canceling"`
-	Closing     bool                   `json:"closing"`
-	Phase       string                 `json:"phase"`
-	Message     string                 `json:"message"`
-	Diagnostic  string                 `json:"diagnostic"`
-	Browser     string                 `json:"browser"`
-	Preview     *Preview               `json:"preview"`
-	Verified    bool                   `json:"verified"`
-	Selected    int                    `json:"selected"`
-	All         bool                   `json:"all"`
-	Progress    arcourt.DownloadCounts `json:"progress"`
-	Bytes       int64                  `json:"bytes"`
-	Result      *Result                `json:"result"`
-	Preferences Preferences            `json:"preferences"`
+	Revision               uint64                 `json:"revision"`
+	Generation             uint64                 `json:"generation"`
+	CaseNumber             string                 `json:"caseNumber"`
+	Busy                   bool                   `json:"busy"`
+	Canceling              bool                   `json:"canceling"`
+	Closing                bool                   `json:"closing"`
+	Phase                  string                 `json:"phase"`
+	Message                string                 `json:"message"`
+	Diagnostic             string                 `json:"diagnostic"`
+	Browser                string                 `json:"browser"`
+	Preview                *Preview               `json:"preview"`
+	Verified               bool                   `json:"verified"`
+	Selected               int                    `json:"selected"`
+	All                    bool                   `json:"all"`
+	Progress               arcourt.DownloadCounts `json:"progress"`
+	Bytes                  int64                  `json:"bytes"`
+	Result                 *Result                `json:"result"`
+	Preferences            Preferences            `json:"preferences"`
+	NamingCredentialStatus string                 `json:"namingCredentialStatus"`
+	NamingNotice           string                 `json:"namingNotice"`
 }
 
 var linkPattern = regexp.MustCompile(`(?i)(?:https?://|www\.)[^\s<>"']+`)
@@ -110,10 +119,14 @@ func resultView(r *arcourt.LocalDownloadResult) *Result {
 		if message == "" && d.Error != "" {
 			message = "Document failed. Inspect output permissions and retry."
 		}
-		v.Documents = append(v.Documents, ResultDocument{
+		result := ResultDocument{
 			DocumentID: d.DocumentID, Description: displayText(d.Description), FilingDate: displayText(d.FilingDate),
 			Filename: d.Filename, SHA256: d.SHA256, Size: d.Size, Status: string(d.Status), SkipReason: d.SkipReason, Saved: d.Saved, Error: message,
-		})
+		}
+		if d.Naming != nil {
+			result.Naming = &NamingResult{Source: d.Naming.Source, Label: displayText(d.Naming.Label), Reason: displayText(d.Naming.Reason)}
+		}
+		v.Documents = append(v.Documents, result)
 	}
 	return v
 }

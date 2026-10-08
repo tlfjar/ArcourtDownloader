@@ -183,7 +183,11 @@ func TestDesktopGUI(t *testing.T) {
 		poll("document.getElementById('selection-count').textContent.startsWith('2 of')")
 	}
 	download := func() { t.Helper(); click("download"); poll("!document.getElementById('results').hidden"); idle() }
-	poll("typeof window.go?.main?.Desktop !== 'undefined' && document.getElementById('browser-info').textContent.includes('Microsoft')")
+	browserName := "Microsoft"
+	if os.Getenv("ARCOURT_BROWSER_EXECUTABLE") != "" {
+		browserName = "Explicit browser"
+	}
+	poll("typeof window.go?.main?.Desktop !== 'undefined' && document.getElementById('browser-info').textContent.includes(" + fmt.Sprintf("%q", browserName) + ")")
 	poll("document.getElementById('about-version').textContent.includes('development, unsigned') && document.getElementById('about-version').textContent.includes('source ')")
 	t.Log("Native Windows application and WebView2 started.")
 	click("choose-folder")
@@ -195,7 +199,7 @@ func TestDesktopGUI(t *testing.T) {
 	click("preview")
 	poll("document.getElementById('status').dataset.phase === 'error'")
 	idle()
-	if s := snapshot(); s.Preview != nil || s.Verified || s.Selected != 0 || s.Phase != "error" {
+	if s := snapshot(); s.Preview != nil || s.Verified || s.Selected != 0 || s.Phase != "error" || !strings.Contains(s.Message, "Case header does not match") {
 		t.Fatalf("mismatched case was accepted: %+v", s)
 	}
 	poll("document.getElementById('download').disabled")
@@ -318,7 +322,7 @@ func TestDesktopGUI(t *testing.T) {
 		t.Fatalf("missing browser: %+v", s)
 	}
 	t.Log("Native ACL write denial and missing-browser setup failed with actionable UI errors.")
-	set("browser", "")
+	set("browser", os.Getenv("ARCOURT_BROWSER_EXECUTABLE"))
 	set("output-setting", out)
 	click("save-settings")
 	idle()

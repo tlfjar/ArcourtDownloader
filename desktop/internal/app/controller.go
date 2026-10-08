@@ -46,14 +46,19 @@ type Controller struct {
 	all      bool
 	factory  Factory
 	store    PreferenceStore
+	secrets  SecretStore
 	cancel   context.CancelFunc
 	done     chan struct{}
 	closed   bool
 }
 
 func New(factory Factory, store PreferenceStore) *Controller {
+	return NewWithSecrets(factory, store, DefaultSecretStore())
+}
+
+func NewWithSecrets(factory Factory, store PreferenceStore, secrets SecretStore) *Controller {
 	p, err := store.Load()
-	c := &Controller{factory: factory, store: store, selected: map[string]bool{}, state: State{Phase: "idle", Preferences: p, Revision: 1}}
+	c := &Controller{factory: factory, store: store, secrets: secrets, selected: map[string]bool{}, state: State{Phase: "idle", Preferences: p, Revision: 1}}
 	if err != nil {
 		c.state.Diagnostic = "Settings could not be read. Save Settings to repair the local preferences file."
 	}
@@ -61,8 +66,32 @@ func New(factory Factory, store PreferenceStore) *Controller {
 		c.state.Preferences = Preferences{}
 		c.state.Diagnostic = "Stored settings are invalid. Configure and save Settings again."
 	}
+	c.refreshNamingCredential()
 	c.detectBrowser()
 	return c
+}
+
+// Caller holds mu. A credential is only read into server memory and its value
+// is never copied into State or Preferences.
+func (c *Controller) refreshNamingCredential() {
+	c.state.NamingCredentialStatus = "missing"
+	provider := c.state.Preferences.NamingProvider
+	if provider == "" {
+		return
+	}
+	if c.secrets == nil {
+		c.state.NamingCredentialStatus = "unavailable"
+		return
+	}
+	configured, err := c.secrets.Status(provider)
+	switch {
+	case err == nil && configured:
+		c.state.NamingCredentialStatus = "configured"
+	case err == nil || errors.Is(err, ErrCredentialMissing):
+		c.state.NamingCredentialStatus = "missing"
+	default:
+		c.state.NamingCredentialStatus = "unavailable"
+	}
 }
 
 func (c *Controller) detectBrowser() {
@@ -102,7 +131,7 @@ func (c *Controller) invalidate() {
 	c.all, c.state.Verified, c.state.Selected = false, false, 0
 	c.state.All = false
 	c.state.Progress, c.state.Bytes = arcourt.DownloadCounts{}, 0
-	c.state.Message, c.state.Phase = "", "idle"
+	c.state.Message, c.state.Phase, c.state.NamingNotice = "", "idle", ""
 }
 
 func (c *Controller) SetCase(number string) error {
@@ -132,6 +161,7 @@ func (c *Controller) SavePreferences(p Preferences) error {
 		return errors.New("Wait for the current operation before changing settings.")
 	}
 	p.CaseURLTemplate, p.BrowserOverride, p.OutputDirectory = strings.TrimSpace(p.CaseURLTemplate), strings.TrimSpace(p.BrowserOverride), strings.TrimSpace(p.OutputDirectory)
+	p.NamingProvider, p.NamingModel, p.NamingConsentRecipient = strings.TrimSpace(p.NamingProvider), strings.TrimSpace(p.NamingModel), strings.TrimSpace(p.NamingConsentRecipient)
 	if err := validatePreferences(p); err != nil {
 		return err
 	}
@@ -142,8 +172,50 @@ func (c *Controller) SavePreferences(p Preferences) error {
 		c.invalidate()
 	}
 	c.state.Preferences = p
+	c.refreshNamingCredential()
+	c.state.NamingNotice = ""
 	c.state.Diagnostic = ""
 	c.detectBrowser()
+	c.touch()
+	return nil
+}
+
+// SaveNamingCredential is the only Wails-facing secret write path. Keys remain
+// in Windows Credential Manager, never in settings JSON or a state snapshot.
+func (c *Controller) SaveNamingCredential(provider, key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.state.Busy || c.closed {
+		return errors.New("Wait for the current operation before changing credentials.")
+	}
+	if provider == "" || provider != c.state.Preferences.NamingProvider {
+		return errors.New("Save the selected AI provider in Settings first.")
+	}
+	key, err := validateCredential(provider, key)
+	if err != nil {
+		return err
+	}
+	if c.secrets == nil || c.secrets.Write(provider, key) != nil {
+		return errors.New("Windows Credential Manager could not save the API key.")
+	}
+	c.refreshNamingCredential()
+	c.touch()
+	return nil
+}
+
+func (c *Controller) RemoveNamingCredential(provider string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.state.Busy || c.closed {
+		return errors.New("Wait for the current operation before changing credentials.")
+	}
+	if provider == "" || provider != c.state.Preferences.NamingProvider {
+		return errors.New("Save the selected AI provider in Settings first.")
+	}
+	if c.secrets == nil || c.secrets.Delete(provider) != nil {
+		return errors.New("Windows Credential Manager could not remove the API key.")
+	}
+	c.refreshNamingCredential()
 	c.touch()
 	return nil
 }
@@ -185,6 +257,7 @@ func (c *Controller) begin(phase string) (context.Context, uint64, Preferences, 
 	c.state.Busy, c.state.Canceling = true, false
 	c.state.Phase, c.state.Message, c.state.Diagnostic = phase, "", ""
 	c.state.Progress, c.state.Bytes, c.state.Result = arcourt.DownloadCounts{}, 0, nil
+	c.state.NamingNotice = ""
 	c.touch()
 	return ctx, c.state.Generation, c.state.Preferences, nil
 }
@@ -235,6 +308,29 @@ func (c *Controller) Download(generation uint64) error {
 	}
 	c.state.Progress.Selected = len(c.selected)
 	req := arcourt.DownloadRequest{CaseNumber: c.state.CaseNumber, Selection: selection, OutputDirectory: prefs.OutputDirectory}
+	if prefs.NamingEnabled {
+		switch {
+		case prefs.NamingConsentRecipient != namingRecipient(prefs.NamingProvider):
+			c.state.NamingNotice = "AI naming skipped: review and consent to the selected provider in Settings. Standard filenames will be used."
+		case c.secrets == nil:
+			c.state.NamingNotice = "AI naming skipped: secure credential storage is unavailable. Standard filenames will be used."
+		default:
+			key, keyErr := c.secrets.Read(prefs.NamingProvider)
+			if keyErr != nil || key == "" {
+				if errors.Is(keyErr, ErrCredentialMissing) || key == "" && keyErr == nil {
+					c.state.NamingCredentialStatus = "missing"
+				} else {
+					c.state.NamingCredentialStatus = "unavailable"
+				}
+				c.state.NamingNotice = "AI naming skipped: provider API key is missing or unavailable. Standard filenames will be used."
+			} else {
+				c.state.NamingCredentialStatus = "configured"
+				req.Naming = &arcourt.NamingRequest{Provider: prefs.NamingProvider, Model: prefs.NamingModel, APIKey: key}
+				c.state.NamingNotice = "AI naming enabled for newly saved documents. Per-document results appear below."
+			}
+		}
+	}
+	c.touch()
 	var allCoverage *arcourt.DiscoveryCoverage
 	if c.all {
 		coverage := c.preview.Discovery
