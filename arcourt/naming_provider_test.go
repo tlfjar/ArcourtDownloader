@@ -103,6 +103,35 @@ func TestNamingProviderPathsAndUsage(t *testing.T) {
 	}
 }
 
+func TestNamingOpenAILunaUsesDirectOutput(t *testing.T) {
+	for _, model := range []string{"gpt-6-luna", "gpt-5.6-luna"} {
+		t.Run(model, func(t *testing.T) {
+			transport := namingRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				reasoning, ok := body["reasoning"].(map[string]any)
+				if !ok || reasoning["effort"] != "none" {
+					t.Fatalf("Luna request must set reasoning.effort=none: %v", body["reasoning"])
+				}
+				if body["max_output_tokens"] != float64(providerOutputTokens) {
+					t.Fatalf("Luna output bound missing: %v", body["max_output_tokens"])
+				}
+				return namingReply(http.StatusOK, `{"id":"resp-1","model":"`+model+`","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"Motion to Dismiss"}]}],"usage":{"input_tokens":10,"output_tokens":5}}`), nil
+			})
+			client, err := newProviderClient(NamingRequest{Provider: "openai", Model: model, APIKey: "test-secret"}, transport)
+			if err != nil {
+				t.Fatal(err)
+			}
+			label, _, err := client.Generate(t.Context(), "System naming instruction", "motion to dismiss")
+			if err != nil || label != "Motion to Dismiss" {
+				t.Fatalf("label=%q error=%v", label, err)
+			}
+		})
+	}
+}
+
 func TestNamingProviderControlledErrorsAndNoHiddenRetries(t *testing.T) {
 	for _, tc := range []struct {
 		name, model string

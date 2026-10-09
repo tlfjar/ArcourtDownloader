@@ -87,14 +87,20 @@ func (c *providerClient) Generate(ctx context.Context, prompt, excerpt string) (
 		},
 	}
 	model := c.model(httpClient)
-	result, err := goai.GenerateText(ctx, model,
+	options := []goai.Option{
 		goai.WithSystem(prompt),
 		goai.WithPrompt(excerpt),
 		goai.WithMaxOutputTokens(providerOutputTokens),
 		goai.WithMaxRetries(0),
 		goai.WithMaxSteps(1),
 		goai.WithPromptCaching(false),
-	)
+	}
+	// Luna defaults to medium reasoning. This short classification task has a
+	// 96-token total output budget, so request direct output for these models.
+	if c.request.Provider == "openai" && (c.request.Model == "gpt-6-luna" || c.request.Model == "gpt-5.6-luna") {
+		options = append(options, goai.WithProviderOptions(map[string]any{"reasoning_effort": "none"}))
+	}
+	result, err := goai.GenerateText(ctx, model, options...)
 	usage.RequestBytes = int(requestBytes.Load())
 	if err != nil {
 		return "", usage, classifyProviderError(ctx, err)

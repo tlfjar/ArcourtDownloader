@@ -95,6 +95,24 @@ The small strategy saved 705 bytes (2.41%) against the baseline but lost one cor
 
 All 43 accepted readable replay labels came from the simulated AI response in the baseline and expansion strategies; the small strategy accepted 42. There is no zero-call local-title route. All 16 ambiguous and scanned cases fell back, and offline replay has no provider-reported usage. Replayed fixture responses cannot establish real-provider accuracy, token billing, or performance on court documents. The generated JSON report records corpus and strategy versions, source revision, case-level results, usage provenance, and a dirty-worktree flag.
 
+### GPT-6 Luna follow-up
+
+OpenAI lists `gpt-6-luna` as its efficient model for focused, high-volume tasks, at $0.10 per million input tokens and $0.50 per million output tokens on the standard tier. It is cheaper than `gpt-5.6-luna` at $0.20 and $1.20. Both Luna models default to medium reasoning; the adapter requests `reasoning.effort: none` for these exact IDs so reasoning does not consume the 96-token short-label budget. Other model requests are unchanged. This is a candidate for evaluation, not a passed quality gate. See the [GPT-6 Luna model page](https://developers.openai.com/api/docs/models/gpt-6-luna), [GPT-5.6 Luna model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna), and [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
+
+First check account access and request compatibility with one transmitted call:
+
+```powershell
+./scripts/benchmark-naming.ps1 -Live -Provider openai -Model gpt-6-luna -MaxCalls 1 -MaxRequestBytes 16384 -AcknowledgeCharges -ReportPath build/naming-benchmark-openai-luna6-smoke.json
+```
+
+The smoke report is deliberately incomplete. If it records a transmitted call and a usable label or controlled `ABSTAIN`, run the full synthetic comparison with another masked key prompt:
+
+```powershell
+./scripts/benchmark-naming.ps1 -Live -Provider openai -Model gpt-6-luna -MaxCalls 205 -MaxRequestBytes 1048576 -AcknowledgeCharges -ReportPath build/naming-benchmark-openai-luna6-live.json
+```
+
+Inspect a model/access error or empty response before spending on the full run. All three strategies must have 59 cases before comparing their quality gates.
+
 ### OpenAI synthetic live result (October 8, 2026)
 
 An operator ran the same 59-case corpus with `gpt-4.1-mini`, a deliberately entered API key, and caps of 205 transmitted calls and 1 MiB of complete request bodies. The report is `build/naming-benchmark-openai-live.json` at source revision `eb235e4c4aba7ebf60a4315fa945c3b371fc53b7` with a clean worktree. Every strategy completed all 59 cases. All 8 ambiguous cases abstained and all 8 image-only scans fell back per strategy; provider usage was reported for every transmitted call.
