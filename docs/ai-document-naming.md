@@ -154,6 +154,8 @@ Review of the eight distinct Luna labels that missed the v3 single-string score 
 | `hold-protective-order` | `Protective Order (Order Granting)` | Awkward but accurate; preserves the order and granting ruling. |
 | `hold-sanctions-response` | `Plaintiff's Response to Motion for Sanctions` | Acceptable possessive filing role; same motion and response. |
 
+Even an exploratory calculation crediting all these variants on the old Luna run would leave production at 38/43 readable labels versus 39/43 for its baseline. That is 88.37% production coverage and a 2.33 percentage point baseline gap, so the production strategy would still fail the original 90% coverage and two-point non-inferiority gates. This calculation does not replace the published v3 scores.
+
 The new `synthetic-court-v4` corpus has 48 previously untested PDFs: 32 readable filings, 8 ambiguous documents, and 8 image-only scans. All cases belong to its new held-out split. Its `predeclared-alias-v1` score accepts a generated label only when it matches a case's primary label or an explicitly listed alias after case folding, whitespace collapse, and removal of a possessive suffix from a filing-party role. The match must also satisfy the case's required and forbidden material tokens. Every approved label is checked against the PDF evidence and the production label validator before evaluation. Unlisted paraphrases count as incorrect in this run, even if they look plausible afterward; they require independent review and another new held-out evaluation before they can enter a later rule. No model judges its own output. The old `synthetic-court-v3` corpus retains `exact-label-v1` scoring.
 
 The original gates remain in force: at least 99% precision among accepted readable labels, at least 90% correct-label coverage of readable PDFs, zero material errors, and no more than two percentage points of coverage loss versus the same-model bounded baseline. With 32 readable cases, coverage needs at least 29 correct labels, accepted precision allows no incorrect label, and even one lost correct label versus baseline exceeds the two-point margin. Ambiguous abstentions and scan fallbacks are reported separately and cannot increase readable coverage. The production excerpt/prompt/validator are unchanged for this evaluation.
@@ -164,7 +166,11 @@ After committing the v4 corpus and scoring code, run its offline replay from the
 ./scripts/benchmark-naming.ps1 -Corpus v4 -ReportPath build/naming-benchmark-v4-offline.json
 ```
 
-The replay validates extraction, request and scoring contracts but cannot measure model accuracy. For a live `gpt-6-luna` evaluation with a masked key prompt and finite caps, run:
+The replay validates extraction, request and scoring contracts but cannot measure model accuracy.
+
+The frozen `cbfd585` offline replay completed all 48 cases in each strategy. Each got 32/32 readable labels from simulated responses, 8/8 ambiguous fallbacks, and 8/8 scan fallbacks, with 40 calls per strategy. Complete request bytes were 22,195 for the bounded baseline and 22,150 for both targeted strategies. This is a contract check only: replay emits the preapproved label when the excerpt contains the fixture title and therefore cannot establish real model accuracy. These v4 fixtures have straightforward opening titles and should be complemented by a later fresh layout-stress set before using their result to claim general minimum-context reliability.
+
+For a live `gpt-6-luna` evaluation with a masked key prompt and finite caps, run:
 
 ```powershell
 ./scripts/benchmark-naming.ps1 -Corpus v4 -Live -Provider openai -Model gpt-6-luna -MaxCalls 241 -MaxRequestBytes 1048576 -AcknowledgeCharges -ReportPath build/naming-benchmark-openai-luna6-v4-live.json
