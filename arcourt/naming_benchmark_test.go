@@ -153,7 +153,7 @@ func namingBenchmarkCorpus() []namingBenchCase {
 
 func TestNamingBenchmarkCorpusValidity(t *testing.T) {
 	seen := map[string]bool{}
-	for _, sample := range namingBenchmarkCorpus() {
+	for _, sample := range append(namingBenchmarkCorpus(), namingBenchmarkCorpusV4()...) {
 		if seen[sample.ID] {
 			t.Fatalf("duplicate synthetic case %s", sample.ID)
 		}
@@ -165,11 +165,16 @@ func TestNamingBenchmarkCorpusValidity(t *testing.T) {
 			if evidence.Reason != "" || evidence.Baseline == "" || len(sample.Acceptable) == 0 {
 				t.Fatalf("invalid readable case %s: reason=%q", sample.ID, evidence.Reason)
 			}
-			if !groundedNamingLabel(sample.Acceptable[0], evidence.Baseline) {
-				t.Fatalf("expected label for %s is not grounded in synthetic baseline %q", sample.ID, evidence.Baseline)
-			}
-			if label, reason := normalizeNamingLabel(sample.Acceptable[0], evidence.Baseline); label == "" {
-				t.Fatalf("expected label for %s rejected against synthetic baseline: %s", sample.ID, reason)
+			for _, acceptable := range sample.Acceptable {
+				if !groundedNamingLabel(acceptable, evidence.Baseline) {
+					t.Fatalf("expected label %q for %s is not grounded in synthetic baseline %q", acceptable, sample.ID, evidence.Baseline)
+				}
+				if label, reason := normalizeNamingLabel(acceptable, evidence.Baseline); label == "" {
+					t.Fatalf("expected label %q for %s rejected against synthetic baseline: %s", acceptable, sample.ID, reason)
+				}
+				if namingBenchmarkMaterialError(sample, acceptable) {
+					t.Fatalf("expected label %q for %s omits a material fact", acceptable, sample.ID)
+				}
 			}
 			if sample.ID == "delayed-confidential-treatment" &&
 				(strings.Contains(strings.ToLower(evidence.Small), "confidential treatment") ||
@@ -434,6 +439,7 @@ type namingBenchReport struct {
 	SourceRevision          string                `json:"source_revision"`
 	WorktreeDirty           bool                  `json:"worktree_dirty"`
 	CorpusVersion           string                `json:"corpus_version"`
+	ScoringVersion          string                `json:"scoring_version"`
 	StrategyVersion         string                `json:"strategy_version"`
 	DateUTC                 string                `json:"date_utc"`
 	GoVersion               string                `json:"go_version"`
@@ -445,6 +451,34 @@ type namingBenchReport struct {
 	Budget                  map[string]int        `json:"live_budget,omitempty"`
 	SelectedLiveStrategy    string                `json:"selected_live_strategy,omitempty"`
 	Strategies              []namingBenchStrategy `json:"strategies"`
+}
+
+// V4 accepts only predeclared case labels. Role possessives and whitespace are
+// stylistic differences; document type, role, ruling, amendment and subject
+// words must still match an approved label in order. Unlisted paraphrases fail
+// pending independent review and a later, newly held-out evaluation.
+func namingBenchmarkCanonicalV4(label string) string {
+	label = strings.ToLower(strings.TrimSpace(label))
+	for _, role := range []string{"plaintiff", "defendant", "petitioner", "respondent", "appellant", "appellee"} {
+		label = strings.ReplaceAll(label, role+"'s", role)
+	}
+	return strings.Join(strings.Fields(label), " ")
+}
+
+func namingBenchmarkCorrectLabel(version string, c namingBenchCase, label string) bool {
+	if label == "" || c.Cohort != "readable" || namingBenchmarkMaterialError(c, label) {
+		return false
+	}
+	for _, acceptable := range c.Acceptable {
+		if version == "synthetic-court-v4" {
+			if namingBenchmarkCanonicalV4(label) == namingBenchmarkCanonicalV4(acceptable) {
+				return true
+			}
+		} else if strings.EqualFold(strings.TrimSpace(label), acceptable) {
+			return true
+		}
+	}
+	return false
 }
 
 func namingBenchmarkMaterialError(c namingBenchCase, label string) bool {
@@ -507,10 +541,22 @@ func TestNamingBenchmark(t *testing.T) {
 	if mode != "offline" && mode != "live" {
 		t.Fatalf("unsupported benchmark mode %q", mode)
 	}
+	corpusChoice := os.Getenv("ARCOURT_BENCH_CORPUS")
+	if corpusChoice == "" {
+		corpusChoice = "v3"
+	}
+	corpusVersion, scoringVersion := namingCorpusVersion, "exact-label-v1"
+	corpus := namingBenchmarkCorpus()
+	if corpusChoice == "v4" {
+		corpusVersion, scoringVersion = "synthetic-court-v4", "predeclared-alias-v1"
+		corpus = namingBenchmarkCorpusV4()
+	} else if corpusChoice != "v3" {
+		t.Fatalf("unsupported benchmark corpus %q", corpusChoice)
+	}
 	revision, dirty := namingBenchmarkGitRevision()
 	report := namingBenchReport{
 		Mode: mode, SourceRevision: revision, WorktreeDirty: dirty,
-		CorpusVersion: namingCorpusVersion, StrategyVersion: namingStrategyVersion,
+		CorpusVersion: corpusVersion, ScoringVersion: scoringVersion, StrategyVersion: namingStrategyVersion,
 		DateUTC: time.Now().UTC().Format(time.RFC3339), GoVersion: runtime.Version(),
 		Platform: runtime.GOOS + "/" + runtime.GOARCH,
 		QualityTargets: map[string]any{
@@ -556,7 +602,6 @@ func TestNamingBenchmark(t *testing.T) {
 		report.Budget = map[string]int{"maximum_calls": maxCalls, "maximum_complete_request_bytes": maxBytes, "maximum_output_tokens_per_call": providerOutputTokens}
 	}
 	report.Provider, report.Model = cfg.Provider, cfg.Model
-	corpus := namingBenchmarkCorpus()
 	strategies := []string{"bounded_baseline_4096", "targeted_small_512", "targeted_with_expansion_512_1024"}
 	stopped := false
 	for _, strategy := range strategies {
@@ -610,12 +655,7 @@ func TestNamingBenchmark(t *testing.T) {
 			if result.Label == "" && result.Fallback == "" {
 				result.Fallback = "unknown"
 			}
-			for _, acceptable := range sample.Acceptable {
-				if strings.EqualFold(strings.TrimSpace(result.Label), acceptable) {
-					result.Correct = true
-					break
-				}
-			}
+			result.Correct = namingBenchmarkCorrectLabel(corpusVersion, sample, result.Label)
 			result.MaterialError = result.Label != "" && !result.Correct && namingBenchmarkMaterialError(sample, result.Label)
 			if transmittedCalls > 0 {
 				result.ExcerptBytes += len(evidence.Small)

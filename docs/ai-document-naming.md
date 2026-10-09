@@ -138,3 +138,36 @@ An operator ran the same corpus with `gpt-6-luna`, the same finite caps, and a c
 Luna returned more exact expected labels than `gpt-4.1-mini`, but every strategy still failed the 99% precision and 90% readable-coverage gates. Production coverage was 4.65 percentage points below its Luna baseline, also failing the two-point margin. Its seven accepted labels that differed from the one exact expected string included possessive party forms, extra title detail, and a reordered ruling; none triggered this corpus's narrower material-error predicates. The production strategy also had five readable fallbacks: two `unsafe_result`, two `insufficient_context`, and one `unsupported_result`. These observations suggest the single-string scorer needs independent legal review and a prospectively defined equivalence rubric; they do not justify changing a gate after seeing its outputs. A fresh unseen evaluation is required after any scoring or naming change. No minimum-context winner was selected.
 
 Across all three strategies, Luna used 16,238 input and 1,392 output tokens versus 16,392 and 1,061 for `gpt-4.1-mini`. At the [published standard text rates for Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) and [GPT-4.1 Mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), those reported token counts imply approximately $0.00232 versus $0.00825 in model-token charges, excluding any account-specific billing adjustments. Summed per-case elapsed time was 194.7 seconds versus 133.9 seconds; this includes local work and network time and is not a model-only latency measurement. Neither synthetic run establishes performance on court/client PDFs.
+
+### Reviewed equivalents and prospective v4 scoring
+
+Review of the eight distinct Luna labels that missed the v3 single-string score found the following evidence-grounded equivalents. This review does **not** change either completed v3 report or its failed gates.
+
+| v3 case | Observed wording beyond the single expected string | Review |
+| --- | --- | --- |
+| `response-dismiss` | `Defendant's Response to Motion to Dismiss` | Acceptable possessive filing role; same motion and response. |
+| `reply-dismiss` | `Plaintiff's Reply to Defendant's Response` | Acceptable; identifies both roles and preserves reply versus response. |
+| `delayed-confidential-treatment` | `Motion for Confidential Treatment of Records` | Acceptable; the body identifies disputed records. |
+| `caption-table` | `Defendant's Motion to Compel Discovery` | Acceptable in this fixture; the body identifies Defendant as movant and discovery as the subject. A caption alone would not establish movant. |
+| `objection-discovery` | `Objection to Discovery (Defendant)` | Acceptable in this fixture; the body identifies Defendant as objector. |
+| `hold-reply-role` | `Defendant's Reply to Plaintiff's Response` | Acceptable possessive roles; same reply and response. |
+| `hold-protective-order` | `Protective Order (Order Granting)` | Awkward but accurate; preserves the order and granting ruling. |
+| `hold-sanctions-response` | `Plaintiff's Response to Motion for Sanctions` | Acceptable possessive filing role; same motion and response. |
+
+The new `synthetic-court-v4` corpus has 48 previously untested PDFs: 32 readable filings, 8 ambiguous documents, and 8 image-only scans. All cases belong to its new held-out split. Its `predeclared-alias-v1` score accepts a generated label only when it matches a case's primary label or an explicitly listed alias after case folding, whitespace collapse, and removal of a possessive suffix from a filing-party role. The match must also satisfy the case's required and forbidden material tokens. Every approved label is checked against the PDF evidence and the production label validator before evaluation. Unlisted paraphrases count as incorrect in this run, even if they look plausible afterward; they require independent review and another new held-out evaluation before they can enter a later rule. No model judges its own output. The old `synthetic-court-v3` corpus retains `exact-label-v1` scoring.
+
+The original gates remain in force: at least 99% precision among accepted readable labels, at least 90% correct-label coverage of readable PDFs, zero material errors, and no more than two percentage points of coverage loss versus the same-model bounded baseline. With 32 readable cases, coverage needs at least 29 correct labels, accepted precision allows no incorrect label, and even one lost correct label versus baseline exceeds the two-point margin. Ambiguous abstentions and scan fallbacks are reported separately and cannot increase readable coverage. The production excerpt/prompt/validator are unchanged for this evaluation.
+
+After committing the v4 corpus and scoring code, run its offline replay from the repository root:
+
+```powershell
+./scripts/benchmark-naming.ps1 -Corpus v4 -ReportPath build/naming-benchmark-v4-offline.json
+```
+
+The replay validates extraction, request and scoring contracts but cannot measure model accuracy. For a live `gpt-6-luna` evaluation with a masked key prompt and finite caps, run:
+
+```powershell
+./scripts/benchmark-naming.ps1 -Corpus v4 -Live -Provider openai -Model gpt-6-luna -MaxCalls 241 -MaxRequestBytes 1048576 -AcknowledgeCharges -ReportPath build/naming-benchmark-openai-luna6-v4-live.json
+```
+
+The 241-call cap permits at most two calls for each of the 40 text cases in all three strategies plus a final no-call scan check; the per-request 16 KiB and per-generation 96-token limits still apply. All three strategies must each contain 48 cases, with no budget exhaustion, before the quality statuses or selected strategy are meaningful. Use the saved source revision and scoring version to distinguish this evaluation from v3.
