@@ -139,7 +139,7 @@ Luna returned more exact expected labels than `gpt-4.1-mini`, but every strategy
 
 Across all three strategies, Luna used 16,238 input and 1,392 output tokens versus 16,392 and 1,061 for `gpt-4.1-mini`. At the [published standard text rates for Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) and [GPT-4.1 Mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini), those reported token counts imply approximately $0.00232 versus $0.00825 in model-token charges, excluding any account-specific billing adjustments. Summed per-case elapsed time was 194.7 seconds versus 133.9 seconds; this includes local work and network time and is not a model-only latency measurement. Neither synthetic run establishes performance on court/client PDFs.
 
-### Reviewed equivalents and prospective v4 scoring
+### Reviewed equivalents and v4 scoring
 
 Review of the eight distinct Luna labels that missed the v3 single-string score found the following evidence-grounded equivalents. This review does **not** change either completed v3 report or its failed gates.
 
@@ -160,7 +160,7 @@ The new `synthetic-court-v4` corpus has 48 previously untested PDFs: 32 readable
 
 The original gates remain in force: at least 99% precision among accepted readable labels, at least 90% correct-label coverage of readable PDFs, zero material errors, and no more than two percentage points of coverage loss versus the same-model bounded baseline. With 32 readable cases, coverage needs at least 29 correct labels, accepted precision allows no incorrect label, and even one lost correct label versus baseline exceeds the two-point margin. Ambiguous abstentions and scan fallbacks are reported separately and cannot increase readable coverage. The production excerpt/prompt/validator are unchanged for this evaluation.
 
-After committing the v4 corpus and scoring code, run its offline replay from the repository root:
+To reproduce the frozen v4 offline replay, run from the repository root:
 
 ```powershell
 ./scripts/benchmark-naming.ps1 -Corpus v4 -ReportPath build/naming-benchmark-v4-offline.json
@@ -170,10 +170,24 @@ The replay validates extraction, request and scoring contracts but cannot measur
 
 The frozen `cbfd585` offline replay completed all 48 cases in each strategy. Each got 32/32 readable labels from simulated responses, 8/8 ambiguous fallbacks, and 8/8 scan fallbacks, with 40 calls per strategy. Complete request bytes were 22,195 for the bounded baseline and 22,150 for both targeted strategies. This is a contract check only: replay emits the preapproved label when the excerpt contains the fixture title and therefore cannot establish real model accuracy. These v4 fixtures have straightforward opening titles and should be complemented by a later fresh layout-stress set before using their result to claim general minimum-context reliability.
 
-For a live `gpt-6-luna` evaluation with a masked key prompt and finite caps, run:
+To reproduce the `gpt-6-luna` live evaluation with a masked key prompt and finite caps, run:
 
 ```powershell
 ./scripts/benchmark-naming.ps1 -Corpus v4 -Live -Provider openai -Model gpt-6-luna -MaxCalls 241 -MaxRequestBytes 1048576 -AcknowledgeCharges -ReportPath build/naming-benchmark-openai-luna6-v4-live.json
 ```
 
 The 241-call cap permits at most two calls for each of the 40 text cases in all three strategies plus a final no-call scan check; the per-request 16 KiB and per-generation 96-token limits still apply. All three strategies must each contain 48 cases, with no budget exhaustion, before the quality statuses or selected strategy are meaningful. Use the saved source revision and scoring version to distinguish this evaluation from v3.
+
+### GPT-6 Luna v4 live result (October 9, 2026)
+
+The operator's `build/naming-benchmark-openai-luna6-v4-live.json` report used clean source revision `8dbf79c024d83c2bb4e1d953ecca7935576d199a`, the frozen `synthetic-court-v4` corpus, and `predeclared-alias-v1` scoring. Every strategy completed all 48 cases; all 8 ambiguous cases abstained and all 8 scans fell back per strategy. All 120 transmitted calls reported usage and zero reasoning tokens. No budget was exhausted.
+
+| Strategy | Correct readable labels | Accepted-name precision | Readable fallbacks | Calls | Complete request bytes | Gate |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Bounded 4,096-character baseline | 29/32 (90.63%) | 100% | 3 | 40 | 23,555 | Met on this synthetic run |
+| Targeted 512-character excerpt | 28/32 (87.50%) | 96.55% | 3 | 40 | 23,510 | Failed |
+| Targeted excerpt with expansion allowed (production) | 28/32 (87.50%) | 96.55% | 3 | 40 | 23,510 | Failed |
+
+The benchmark selected the bounded baseline as the only strategy meeting its gates on this run. Both targeted strategies trail it by one readable case, or 3.125 percentage points, beyond the two-point margin. They saved only 45 complete request bytes (0.19%) each; the production strategy made no second calls. The targeted strategies accepted one unlisted label, `Plaintiff's Reply to Defendant's Response on Motion to Strike`, which appears consistent with that synthetic document but fails the rule frozen before the run. It cannot be credited retroactively. The baseline rejected that case as `unsafe_result`, but accepted `Notice of Removal`; the targeted strategies rejected that notice as `unsafe_result`. All strategies rejected `Entered Order Vacating Hearing` as `unsupported_result` and `Notice of Substitution of Counsel` as `unsafe_result`. The report stores no raw rejected replies, so the exact rejection rule cannot be diagnosed from this artifact.
+
+This result supports only the bounded baseline on this straightforward-title synthetic set. It does not supersede the failed v3 layout-stress run or establish general minimum-context reliability, real court-document accuracy, or an adopted production default. The near-identical transmitted context and differing labels are also insufficient to attribute the one-case difference to excerpt size rather than model variation. The production targeted strategy remains below the declared gate.
