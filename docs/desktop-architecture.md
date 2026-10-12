@@ -24,7 +24,7 @@ desktop module; the root keeps v0.42.0. Root Go tests/builds exclude the nested
 module and need no GUI tools.
 
 Use Windows 11 x64, a supported patched Go 1.26+ toolchain, and Node.js 24 LTS or
-newer. Validation used Go 1.26.8, Node 24.12.0, and npm 11.6.2. There are **no
+newer. Validation used Go 1.26.9, Node 24.12.0, and npm 11.6.2. There are **no
 third-party frontend dependencies**. `package-lock.json` records the empty
 dependency graph. Node checks syntax, runs state tests, and copies four static
 assets for embedding. No dev server, bundler, C compiler, or browser download is

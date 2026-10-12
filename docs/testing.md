@@ -12,7 +12,7 @@ acknowledgement, an intentionally supplied key, and enforced finite limits.
 
 ## Tooling and module layout
 
-The checked-in workflow pins Go 1.26.8 and Node 24.12.0; the desktop uses Wails
+The checked-in workflow pins Go 1.26.9 and Node 24.12.0; the desktop uses Wails
 v2.16.0. Use PowerShell 5.1 or 7 on Windows 11 x64, with Go, Node and npm on PATH.
 Modules require Go 1.26+ and the frontend requires Node 24+. Initial tool/module
 downloads require internet access. Browserless core/controller checks also run on
@@ -20,7 +20,7 @@ Linux in CI using PowerShell 7. Windows GUI support requires WebView2, with Edge
 or Chrome separately installed for browser automation.
 
 Release/local packaging and asset verification require PowerShell 7.4+ and the
-reviewed Go 1.26.8 toolchain. After `scripts/package-windows.ps1`, run
+reviewed Go 1.26.9 toolchain. After `scripts/package-windows.ps1`, run
 `scripts/test-release-packaging.ps1 -AssetsPath <printed-directory>` for archive
 mutation and release rejection checks. These use isolated temporary assets and
 a temporary Git repository; they do not create tags in this repository or sign
@@ -135,7 +135,7 @@ court requests, human GUI walkthroughs, or release publication.
 CI also runs pinned govulncheck for each Go module's Windows packages, workflow
 policy/rejection rehearsals, actionlint, and dependency review on public PRs.
 The desktop/local-package job runs the archive mutation tests. Reproduce the
-additional source checks with PowerShell 7.4+ and Go 1.26.8:
+additional source checks with PowerShell 7.4+ and Go 1.26.9:
 
 ```powershell
 .\scripts\check-vulnerabilities.ps1 -Module root

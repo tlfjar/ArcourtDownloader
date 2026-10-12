@@ -1202,7 +1202,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ============================================================
-Go standard library@go1.26.8
+Go standard library@go1.26.9
 License: BSD-3-Clause AND MIT AND BSD-1-Clause AND SunPro AND LicenseRef-Cephes AND LicenseRef-Rijndael
 Source: https://go.dev/LICENSE
 

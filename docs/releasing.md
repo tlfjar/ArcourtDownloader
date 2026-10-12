@@ -24,7 +24,7 @@ From the repository root on Windows, with the [testing prerequisites](testing.md
 .\scripts\package-windows.ps1
 ```
 
-Packaging requires PowerShell 7.4+, Go 1.26.8 and Node 24+. It selects the
+Packaging requires PowerShell 7.4+, Go 1.26.9 and Node 24+. It selects the
 reviewed Go toolchain from `scripts/licenses/catalog.json` and restores the
 caller's `GOTOOLCHAIN` setting. The default command builds both executables and
 creates a unique ignored `build/packages/` directory containing a development

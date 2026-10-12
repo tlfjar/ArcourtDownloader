@@ -486,7 +486,7 @@
     },
     {
       "Name": "Go standard library",
-      "Version": "go1.26.8",
+      "Version": "go1.26.9",
       "License": "BSD-3-Clause AND MIT AND BSD-1-Clause AND SunPro AND LicenseRef-Cephes AND LicenseRef-Rijndael",
       "Source": "https://go.dev/LICENSE",
       "Materials": [
