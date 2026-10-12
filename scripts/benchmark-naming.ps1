@@ -1,6 +1,6 @@
 param(
     [switch]$Live,
-    [ValidateSet('v3', 'v4')][string]$Corpus = 'v3',
+    [ValidateSet('v3', 'v4', 'v5')][string]$Corpus = 'v3',
     [ValidateSet('openai', 'xai', 'anthropic', 'google')][string]$Provider,
     [string]$Model,
     [int]$MaxCalls,
@@ -14,7 +14,7 @@ $repo = Split-Path -Parent $PSScriptRoot
 if (-not $ReportPath) {
     $name = if ($Corpus -eq 'v3') {
         if ($Live) { 'naming-benchmark-live.json' } else { 'naming-benchmark-offline.json' }
-    } elseif ($Live) { 'naming-benchmark-v4-live.json' } else { 'naming-benchmark-v4-offline.json' }
+    } elseif ($Live) { "naming-benchmark-$Corpus-live.json" } else { "naming-benchmark-$Corpus-offline.json" }
     $ReportPath = Join-Path $repo (Join-Path 'build' $name)
 } elseif (-not [System.IO.Path]::IsPathRooted($ReportPath)) {
     $ReportPath = Join-Path $repo $ReportPath

@@ -153,7 +153,7 @@ func namingBenchmarkCorpus() []namingBenchCase {
 
 func TestNamingBenchmarkCorpusValidity(t *testing.T) {
 	seen := map[string]bool{}
-	for _, sample := range append(namingBenchmarkCorpus(), namingBenchmarkCorpusV4()...) {
+	for _, sample := range append(append(namingBenchmarkCorpus(), namingBenchmarkCorpusV4()...), namingBenchmarkCorpusV5()...) {
 		if seen[sample.ID] {
 			t.Fatalf("duplicate synthetic case %s", sample.ID)
 		}
@@ -454,10 +454,11 @@ type namingBenchReport struct {
 	Strategies              []namingBenchStrategy `json:"strategies"`
 }
 
-// V4 accepts only predeclared case labels. Role possessives and whitespace are
-// stylistic differences; document type, role, ruling, amendment and subject
-// words must still match an approved label in order. Unlisted paraphrases fail
-// pending independent review and a later, newly held-out evaluation.
+// V4 and V5 accept only predeclared case labels. Role possessives and
+// whitespace are stylistic differences; document type, role, ruling, amendment
+// and subject words must still match an approved label in order. Unlisted
+// paraphrases fail pending independent review and a later, newly held-out
+// evaluation.
 func namingBenchmarkCanonicalV4(label string) string {
 	label = strings.ToLower(strings.TrimSpace(label))
 	for _, role := range []string{"plaintiff", "defendant", "petitioner", "respondent", "appellant", "appellee"} {
@@ -471,7 +472,7 @@ func namingBenchmarkCorrectLabel(version string, c namingBenchCase, label string
 		return false
 	}
 	for _, acceptable := range c.Acceptable {
-		if version == "synthetic-court-v4" {
+		if version == "synthetic-court-v4" || version == "synthetic-court-v5" {
 			if namingBenchmarkCanonicalV4(label) == namingBenchmarkCanonicalV4(acceptable) {
 				return true
 			}
@@ -548,10 +549,15 @@ func TestNamingBenchmark(t *testing.T) {
 	}
 	corpusVersion, scoringVersion := namingCorpusVersion, "exact-label-v1"
 	corpus := namingBenchmarkCorpus()
-	if corpusChoice == "v4" {
+	switch corpusChoice {
+	case "v3":
+	case "v4":
 		corpusVersion, scoringVersion = "synthetic-court-v4", "predeclared-alias-v1"
 		corpus = namingBenchmarkCorpusV4()
-	} else if corpusChoice != "v3" {
+	case "v5":
+		corpusVersion, scoringVersion = "synthetic-court-v5", "predeclared-alias-v1"
+		corpus = namingBenchmarkCorpusV5()
+	default:
 		t.Fatalf("unsupported benchmark corpus %q", corpusChoice)
 	}
 	revision, dirty := namingBenchmarkGitRevision()
