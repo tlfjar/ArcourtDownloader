@@ -51,6 +51,10 @@ the selection before launch. `Headless: true` runs without a window;
 `Headless: false` (the zero value) displays the isolated browser window.
 `PageTimeout` applies to startup and page loading for both previews and fetches
 (default 90 seconds). No source edits are required to change these options.
+If an auto-discovered browser exits before its local automation endpoint is
+available, startup is retried twice within the same timeout, each time with a
+fresh isolated profile. An explicit executable override is not retried, so a
+bad operator-supplied path or incompatible executable fails immediately.
 
 ```go
 fetcher, err := arcourt.NewBrowserFetcher(arcourt.BrowserFetcherConfig{

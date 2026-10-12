@@ -127,6 +127,54 @@ func TestBrowserSessionCleanup(t *testing.T) {
 	}
 }
 
+func TestDiscoveredBrowserRetriesTransientLaunchFailure(t *testing.T) {
+	var (
+		profiles []string
+		stops    atomic.Int32
+	)
+	f := fakeBrowserFetcher(t, func(ctx context.Context, _ BrowserInfo, _ bool, profile string) (context.Context, func(), error) {
+		profiles = append(profiles, profile)
+		stop := func() { stops.Add(1) }
+		if len(profiles) < 3 {
+			return ctx, stop, errors.New("browser exited before exposing DevTools")
+		}
+		return ctx, stop, nil
+	})
+	f.browser.Source = "installation"
+
+	_, cleanup, err := f.openBrowser(context.Background(), 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanup()
+	if len(profiles) != 3 {
+		t.Fatalf("launch attempts = %d, want 3", len(profiles))
+	}
+	if profiles[0] == profiles[1] || profiles[1] == profiles[2] || profiles[0] == profiles[2] {
+		t.Fatalf("launch profiles were reused: %v", profiles)
+	}
+	for _, profile := range profiles {
+		requireProfileRemoved(t, profile)
+	}
+	if stops.Load() != 3 {
+		t.Fatalf("stop called %d times, want 3", stops.Load())
+	}
+}
+
+func TestExplicitBrowserDoesNotRetryLaunchFailure(t *testing.T) {
+	var attempts atomic.Int32
+	f := fakeBrowserFetcher(t, func(ctx context.Context, _ BrowserInfo, _ bool, _ string) (context.Context, func(), error) {
+		attempts.Add(1)
+		return ctx, func() {}, errors.New("browser exited before exposing DevTools")
+	})
+	if _, _, err := f.openBrowser(context.Background(), 5*time.Second); err == nil || !strings.Contains(err.Error(), "attempts=1") {
+		t.Fatalf("unexpected launch error: %v", err)
+	}
+	if attempts.Load() != 1 {
+		t.Fatalf("launch attempts = %d, want 1", attempts.Load())
+	}
+}
+
 func TestCancelAtLaunchBoundary(t *testing.T) {
 	for _, shutdown := range []bool{false, true} {
 		t.Run(map[bool]string{false: "caller", true: "app exit"}[shutdown], func(t *testing.T) {

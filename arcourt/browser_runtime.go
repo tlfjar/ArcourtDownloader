@@ -17,6 +17,8 @@ import (
 // ErrBrowserFetcherClosed is returned after application shutdown begins.
 var ErrBrowserFetcherClosed = errors.New("browser fetcher is closed")
 
+var browserLaunchRetryDelays = [...]time.Duration{250 * time.Millisecond, 750 * time.Millisecond}
+
 // A launcher must return a stop function even on failure if it acquired resources.
 // stop waits for the application's browser process to exit before returning.
 type browserLauncher func(context.Context, BrowserInfo, bool, string) (context.Context, func(), error)
@@ -70,16 +72,20 @@ type browserStartupError struct {
 func (e *browserStartupError) Error() string { return e.message }
 func (e *browserStartupError) Unwrap() error { return e.cause }
 
-func (f *BrowserFetcher) startupError(stage string, timeout time.Duration, cause error) error {
+func (f *BrowserFetcher) startupError(stage string, timeout time.Duration, attempts int, cause error) error {
 	reason := "check executable permissions, browser installation, and writable system temporary storage"
 	if errors.Is(cause, context.Canceled) {
 		reason = "operation canceled"
 	} else if errors.Is(cause, context.DeadlineExceeded) {
 		reason = "startup deadline exceeded; check the browser installation or increase PageTimeout"
 	}
+	attemptSummary := ""
+	if stage == "launch" {
+		attemptSummary = fmt.Sprintf(", attempts=%d", attempts)
+	}
 	return &browserStartupError{
-		message: fmt.Sprintf("browser %s failed: %s (%q, source=%s, headless=%t, timeout=%s, sandbox=enabled, TLS=verified, profile=isolated temporary); %s",
-			stage, f.browser.Name, f.browser.ExecutablePath, f.browser.Source, f.cfg.Headless, timeout, reason),
+		message: fmt.Sprintf("browser %s failed: %s (%q, source=%s, headless=%t, timeout=%s%s, sandbox=enabled, TLS=verified, profile=isolated temporary); %s",
+			stage, f.browser.Name, f.browser.ExecutablePath, f.browser.Source, f.cfg.Headless, timeout, attemptSummary, reason),
 		cause: cause,
 	}
 }
@@ -119,22 +125,57 @@ func (f *BrowserFetcher) openBrowser(parent context.Context, timeout time.Durati
 		cleanup()
 		return nil, nil, err
 	}
-	var err error
-	profile, err = os.MkdirTemp("", "arcourt-browser-")
-	if err != nil {
-		cleanup()
-		return nil, nil, f.startupError("profile creation", timeout, err)
+	recordProfileCleanupError := func() {
+		f.mu.Lock()
+		f.cleanupErr = errors.Join(f.cleanupErr, errors.New("could not remove an application temporary browser profile; check temporary-directory permissions and file locks"))
+		f.mu.Unlock()
 	}
-	browserCtx, stop, err := f.launch(ctx, f.browser, f.cfg.Headless, profile)
-	stopBrowser = stop
-	if ctx.Err() != nil {
-		// A canceled process can report EOF or a startup failure instead of the
-		// context error. Preserve cancellation/deadline semantics for callers.
-		err = ctx.Err()
-	}
-	if err != nil {
-		cleanup()
-		return nil, nil, f.startupError("launch", timeout, err)
+	var (
+		browserCtx context.Context
+		err        error
+		attempts   int
+	)
+	for {
+		attempts++
+		profile, err = os.MkdirTemp("", "arcourt-browser-")
+		if err != nil {
+			cleanup()
+			return nil, nil, f.startupError("profile creation", timeout, attempts, err)
+		}
+		browserCtx, stopBrowser, err = f.launch(ctx, f.browser, f.cfg.Headless, profile)
+		if ctx.Err() != nil {
+			// A canceled process can report EOF or a startup failure instead of the
+			// context error. Preserve cancellation/deadline semantics for callers.
+			err = ctx.Err()
+		}
+		if err == nil {
+			break
+		}
+		if f.browser.Source == "explicit" || attempts > len(browserLaunchRetryDelays) || ctx.Err() != nil {
+			cleanup()
+			return nil, nil, f.startupError("launch", timeout, attempts, err)
+		}
+		if stopBrowser != nil {
+			stopBrowser()
+			stopBrowser = nil
+		}
+		if removeBrowserProfile(profile) != nil {
+			recordProfileCleanupError()
+		}
+		profile = ""
+		timer := time.NewTimer(browserLaunchRetryDelays[attempts-1])
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			cleanup()
+			return nil, nil, f.startupError("launch", timeout, attempts, ctx.Err())
+		case <-timer.C:
+		}
 	}
 	// Also clean up if the caller cancels or the browser exits before the operation
 	// returns. Start only after launch has finished publishing its stop function.
