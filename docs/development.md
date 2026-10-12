@@ -6,7 +6,7 @@ End users can use the portable executables described in the [README](../README.m
 ## Prerequisites
 
 Use Windows 11 x64, Git, PowerShell 5.1 or 7, Go 1.26+, and Node.js 24+ with npm.
-The checked workflow uses Go 1.26.8, Node.js 24.12.0, npm 11.6.2, and Wails
+The checked workflow uses Go 1.26.9, Node.js 24.12.0, npm 11.6.2, and Wails
 v2.16.0. Initial tool and module downloads need internet access. The scripts
 invoke a pinned Wails version, so a global Wails installation and a C compiler
 are not needed for ordinary Windows builds.

@@ -4,10 +4,15 @@ Tests use fabricated cases, generated PDF bytes, temporary local files, and
 loopback HTTP servers. Automated checks and CI must not contact the court or use
 client documents, credentials, signed URLs, or personal browser profiles. Test
 fixtures are not evidence of current court compatibility or complete records.
+AI naming regressions use structurally valid synthetic PDFs and injected provider
+transports. Ordinary checks make zero paid provider calls. The separate
+[naming benchmark](ai-document-naming.md#benchmark-and-evidence) has an
+offline replay mode; its optional live synthetic mode needs explicit charge
+acknowledgement, an intentionally supplied key, and enforced finite limits.
 
 ## Tooling and module layout
 
-The checked-in workflow pins Go 1.26.8 and Node 24.12.0; the desktop uses Wails
+The checked-in workflow pins Go 1.26.9 and Node 24.12.0; the desktop uses Wails
 v2.16.0. Use PowerShell 5.1 or 7 on Windows 11 x64, with Go, Node and npm on PATH.
 Modules require Go 1.26+ and the frontend requires Node 24+. Initial tool/module
 downloads require internet access. Browserless core/controller checks also run on
@@ -15,7 +20,7 @@ Linux in CI using PowerShell 7. Windows GUI support requires WebView2, with Edge
 or Chrome separately installed for browser automation.
 
 Release/local packaging and asset verification require PowerShell 7.4+ and the
-reviewed Go 1.26.8 toolchain. After `scripts/package-windows.ps1`, run
+reviewed Go 1.26.9 toolchain. After `scripts/package-windows.ps1`, run
 `scripts/test-release-packaging.ps1 -AssetsPath <printed-directory>` for archive
 mutation and release rejection checks. These use isolated temporary assets and
 a temporary Git repository; they do not create tags in this repository or sign
@@ -66,6 +71,9 @@ Coverage includes:
   verified repeat skips, injected I/O failure, and interrupted processes.
 - CLI argument bounds, text/JSON output and exit codes; desktop selection,
   generations, cancellation, progress, settings, and frontend state transitions.
+- Opening-page PDF extraction limits and scan fallback; four native provider
+  request/response shapes; context/call bounds; naming receipt/recovery/reruns,
+  secure credential settings, and filename fallback without PDF loss.
 
 Windows-only tests cover junctions and open-handle rename failure. Symbolic-link
 tests may skip when the account cannot create links; inspect and record skips.
@@ -97,7 +105,10 @@ to loopback without adding a production localhost exception.
 
 ```powershell
 .\scripts\build-desktop.ps1
-# Requires an interactive English Windows session, Edge and WebView2:
+# Requires an interactive English Windows session, WebView2, and Edge or Chrome:
+.\scripts\check-fixtures.ps1 -Desktop
+# If Edge cannot launch, select an installed Chrome explicitly for this run:
+$env:ARCOURT_BROWSER_EXECUTABLE = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
 .\scripts\check-fixtures.ps1 -Desktop
 ```
 
@@ -124,7 +135,7 @@ court requests, human GUI walkthroughs, or release publication.
 CI also runs pinned govulncheck for each Go module's Windows packages, workflow
 policy/rejection rehearsals, actionlint, and dependency review on public PRs.
 The desktop/local-package job runs the archive mutation tests. Reproduce the
-additional source checks with PowerShell 7.4+ and Go 1.26.8:
+additional source checks with PowerShell 7.4+ and Go 1.26.9:
 
 ```powershell
 .\scripts\check-vulnerabilities.ps1 -Module root

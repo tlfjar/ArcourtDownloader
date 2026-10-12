@@ -5,7 +5,7 @@ It preserves upstream text, its normalized UTF-8 SHA-256, the source-relative
 filename and the Go module content checksum. `THIRD_PARTY_NOTICES.txt` is its
 deterministic rendering. The standard-library-only generator is
 `scripts/release-tool` version `arcourt-release-tool-1`; there is no floating
-generator download. Go **1.26.8** is required until its license inventory is
+generator download. Go **1.26.9** is required until its license inventory is
 reviewed again. Packaging requires PowerShell **7.4+** and Node **24+**.
 
 Run `./scripts/generate-notices.ps1` to render notices, or add `-Check` to check

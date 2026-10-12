@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -13,7 +14,26 @@ type Preferences struct {
 	OutputDirectory string `json:"outputDirectory"`
 	BrowserOverride string `json:"browserOverride"`
 	CaseURLTemplate string `json:"caseURLTemplate"`
+	NamingEnabled   bool   `json:"namingEnabled"`
+	NamingProvider  string `json:"namingProvider"`
+	NamingModel     string `json:"namingModel"`
+	// NamingConsentRecipient is the exact direct endpoint approved in Settings.
+	// Changing a provider endpoint requires fresh consent.
+	NamingConsentRecipient string `json:"namingConsentRecipient"`
 }
+
+var namingRecipients = map[string]string{
+	"openai":    "https://api.openai.com/v1/responses",
+	"xai":       "https://api.x.ai/v1/chat/completions",
+	"anthropic": "https://api.anthropic.com/v1/messages",
+	"google":    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+}
+
+// Keep this in step with arcourt's local NamingRequest model validation. A
+// rejected model must be caught when Settings are saved, before any download.
+var namingModelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
+
+func namingRecipient(provider string) string { return namingRecipients[provider] }
 
 type PreferenceStore struct{ Path string }
 
@@ -68,6 +88,18 @@ func (s PreferenceStore) Save(p Preferences) error {
 // A settings form is configuration, not a credential store. Actual document URL
 // validation remains exclusively in the shared service.
 func validatePreferences(p Preferences) error {
+	if p.NamingProvider != "" && namingRecipient(p.NamingProvider) == "" {
+		return errors.New("Choose OpenAI, xAI, Anthropic, or Google for AI naming.")
+	}
+	if p.NamingModel != "" && !namingModelID.MatchString(p.NamingModel) {
+		return errors.New("Enter a model ID of at most 128 letters, digits, dots, underscores, colons, or hyphens, starting with a letter or digit.")
+	}
+	if p.NamingEnabled && (p.NamingProvider == "" || strings.TrimSpace(p.NamingModel) == "") {
+		return errors.New("Choose a provider and model before enabling AI naming.")
+	}
+	if p.NamingConsentRecipient != "" && p.NamingConsentRecipient != namingRecipient(p.NamingProvider) {
+		return errors.New("Review and consent to the selected AI recipient again.")
+	}
 	if p.CaseURLTemplate != "" {
 		u, err := url.Parse(strings.ReplaceAll(p.CaseURLTemplate, "{case_number}", "60CV-2026-1"))
 		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || !strings.Contains(p.CaseURLTemplate, "{case_number}") {

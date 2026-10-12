@@ -10,6 +10,7 @@ import (
 
 type localSink struct {
 	store    *downloadStore
+	naming   *namingSession
 	selected map[string]DocketEntry
 	results  map[string]LocalDocumentResult
 	writers  []*localWriter
@@ -113,10 +114,35 @@ func (w *localWriter) Commit() (err error) {
 	}
 	w.record.Size, w.record.SHA256 = size, hash
 	w.record.Status, w.record.Saved = DocumentSucceeded, true
-	label := strings.TrimSuffix(SanitizeFilename(w.record.FilingDate+" "+w.record.Description, "document"), ".pdf")
+	labelSource := w.record.Description
+	if w.sink.naming != nil {
+		f, openErr := openRegular(s.disk.root, w.temp, os.O_RDONLY)
+		if openErr != nil {
+			w.record.Naming = &NamingOutcome{Source: "deterministic", Reason: "unreadable", Strategy: namingStrategyVersion}
+		} else {
+			w.record.Naming = w.sink.naming.name(w.ctx, f, size)
+			_ = f.Close()
+		}
+		if w.record.Naming.Source == "ai" {
+			labelSource = w.record.Naming.Label
+		}
+	}
+	label := strings.TrimSuffix(SanitizeFilename(w.record.FilingDate+" "+labelSource, "document"), ".pdf")
+	// Sanitization expands some characters (notably '&' -> 'and'). Check the
+	// actual stem as well as the raw text before accepting an AI label so the
+	// filename maker never truncates away a material qualifier or exceeds its
+	// basename budget after identity and a collision suffix are appended.
+	if w.record.Naming != nil && w.record.Naming.Source == "ai" &&
+		(len(strings.TrimSpace(w.record.FilingDate+" "+labelSource)) > 90 || len(label) > 90) {
+		w.record.Naming.Source, w.record.Naming.Label, w.record.Naming.Reason = "deterministic", "", "length_exhaustion"
+		labelSource = w.record.Description
+		label = strings.TrimSuffix(SanitizeFilename(w.record.FilingDate+" "+labelSource, "document"), ".pdf")
+	}
 	// Leave room for identity, collision suffixes, and the extension.
-	if len(label) > 72 {
-		label = strings.TrimRight(label[:72], "._-")
+	if w.record.Naming == nil || w.record.Naming.Source != "ai" {
+		if len(label) > 72 {
+			label = strings.TrimRight(label[:72], "._-")
+		}
 	}
 	base := label + "-" + w.record.DocumentID[:16] + ".pdf"
 	for attempt := 0; attempt < 32; attempt++ {
@@ -129,8 +155,13 @@ func (w *localWriter) Commit() (err error) {
 		if err != nil {
 			return err
 		}
-		if err = w.ctx.Err(); err != nil {
-			return err
+		// Once a staged PDF has passed independent validation, an optional naming
+		// cancellation uses the deterministic name and bounded local finalization.
+		// The download result still reports the canceled job context.
+		if w.sink.naming == nil {
+			if err = w.ctx.Err(); err != nil {
+				return err
+			}
 		}
 		if err = s.disk.check("publish.link", name); err == nil {
 			err = s.disk.root.Link(w.temp, name)

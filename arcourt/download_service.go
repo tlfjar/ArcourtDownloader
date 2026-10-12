@@ -14,9 +14,10 @@ import (
 // may run at a time. The caller owns the fetcher's lifetime and cancels through
 // context; browser fetchers must also be closed on application shutdown.
 type DownloadService struct {
-	fetcher    CaseFetcher
-	active     atomic.Bool
-	diskBefore func(operation, name string) error
+	fetcher             CaseFetcher
+	active              atomic.Bool
+	diskBefore          func(operation, name string) error
+	namingClientFactory namingClientFactory
 }
 
 func NewDownloadService(fetcher CaseFetcher) (*DownloadService, error) {
@@ -124,6 +125,11 @@ func summarizeLocal(result *LocalDownloadResult) {
 // selection creates nothing. The result always partitions the selected set,
 // including setup errors and cancellation; inspect it even if err is non-nil.
 func (s *DownloadService) Download(ctx context.Context, req DownloadRequest, events chan<- DownloadEvent) (result *LocalDownloadResult, err error) {
+	var namingConfig *NamingRequest
+	if req.Naming != nil {
+		configCopy := *req.Naming
+		namingConfig = &configCopy // Freeze the selected recipient/model/key for this job.
+	}
 	result = &LocalDownloadResult{CaseNumber: normalizeCaseNumber(req.CaseNumber)}
 	entries := map[string]DocketEntry{}
 	var selected []string
@@ -253,6 +259,9 @@ func (s *DownloadService) Download(ctx context.Context, req DownloadRequest, eve
 	}
 	var fetched *DownloadResult
 	if len(remaining) > 0 && ctx.Err() == nil {
+		if namingConfig != nil {
+			sink.naming = newNamingSession(*namingConfig, s.namingClientFactory)
+		}
 		fetched, err = s.fetcher.DownloadCaseDocuments(ctx, result.CaseNumber, DocumentSelection{SourceURLs: remaining}, sink)
 	}
 	byID := map[string]DocumentOutcome{}

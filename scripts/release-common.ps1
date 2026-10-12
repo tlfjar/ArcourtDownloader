@@ -1,7 +1,7 @@
 # Packaging and verification require PowerShell 7.4+.
 . (Join-Path $PSScriptRoot 'common.ps1')
 $script:ReleaseRepo = Split-Path -Parent $PSScriptRoot
-$script:PayloadNames = @('ArcourtDownloader.exe', 'arcourt-download.exe', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'README.md', 'SUPPORT.md', 'SECURITY.md', 'docs/command-line-workflow.md', 'docs/releasing.md', 'BUILD.json', 'SBOM.spdx.json', 'FILE_SHA256SUMS.txt')
+$script:PayloadNames = @('ArcourtDownloader.exe', 'arcourt-download.exe', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'README.md', 'SUPPORT.md', 'SECURITY.md', 'docs/ai-connector-evaluation.md', 'docs/ai-document-naming.md', 'docs/command-line-workflow.md', 'docs/releasing.md', 'BUILD.json', 'SBOM.spdx.json', 'FILE_SHA256SUMS.txt')
 
 function Get-ReviewedGoToolchain {
     $catalog = Get-Content -LiteralPath (Join-Path $script:ReleaseRepo 'scripts/licenses/catalog.json') -Raw | ConvertFrom-Json
@@ -94,7 +94,7 @@ function Assert-Payload([string]$Directory, $Identity) {
     $suffix = if ($Identity.release) { '; release source' } else { '; development, unsigned' }
     if ($resource.FileVersion -cne $Identity.windowsVersion -or $resource.ProductVersion -cne $Identity.windowsVersion -or $resource.Comments -cne "$($Identity.version); source $($Identity.commit)$suffix") { throw 'GUI Windows resource identity mismatch.' }
     foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { Assert-UnsignedExecutable (Join-Path $Directory $name) }
-    foreach ($name in @('LICENSE','THIRD_PARTY_NOTICES.txt','README.md','SUPPORT.md','SECURITY.md','docs/command-line-workflow.md','docs/releasing.md')) {
+    foreach ($name in @('LICENSE','THIRD_PARTY_NOTICES.txt','README.md','SUPPORT.md','SECURITY.md','docs/ai-connector-evaluation.md','docs/ai-document-naming.md','docs/command-line-workflow.md','docs/releasing.md')) {
         if ([IO.File]::ReadAllText((Join-Path $Directory $name)) -cne [IO.File]::ReadAllText((Join-Path $script:ReleaseRepo $name)).Replace("`r`n","`n")) { throw "Payload differs from reviewed source: $name" }
     }
     $temporary = Join-Path ([IO.Path]::GetTempPath()) ('arcourt-sbom-' + [Guid]::NewGuid().ToString('N') + '.json')

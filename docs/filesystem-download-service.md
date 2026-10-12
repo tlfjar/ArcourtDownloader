@@ -75,6 +75,16 @@ existing `.pdf` extension, and appends `.pdf` after other extensions. The servic
 bounds its label further to leave space for identity and collision suffixes.
 Full original text is preserved in the manifest. URLs are never used as paths.
 
+With an explicit `DownloadRequest.Naming`, the service can select an AI label
+from bounded opening-page text after the staged PDF has been independently
+checked, before the recovery receipt and no-overwrite hard link are created.
+Accepted labels are at most 64 ASCII bytes and are combined with the existing
+filing-date and 16-hex identity convention. The complete basename remains at
+most 120 bytes, including the PDF extension and collision suffix. The label is
+never used as a path. If a label is unsafe, unsupported, ambiguous, or too long
+to fit without losing a qualifier, the ordinary docket-derived filename is used.
+The CLI passes no naming request; see [AI document naming](ai-document-naming.md).
+
 Existing directory entries and historical manifest filenames reserve names
 case-insensitively on every platform. Collisions receive `-1`, `-2`, etc. A
 modified, missing, unrelated, or symlinked file is never assumed complete.
@@ -100,6 +110,12 @@ closed, reopened, and independently screened for a PDF header/trailer and hashed
 There is a 1 GiB service ceiling even for custom fetchers; the browser fetcher's
 default 64 MiB transfer limit is tighter. Neither whole PDFs nor batches are
 buffered in memory. PDF screening is not a full object/xref validator.
+
+Optional naming reads only the verified closed temporary file through the
+contained directory handle. Naming never modifies the PDF bytes. An unreadable
+or image-only PDF can still pass ordinary PDF screening and be published under
+the standard filename. Naming failure is a successful PDF download with a
+controlled naming fallback reason, not `ErrDocumentsIncomplete`.
 
 Before publishing, the service writes a complete versioned recovery receipt
 `.arcourt-receipt-<nonce>.json` describing the case, document, temporary name,
@@ -162,6 +178,7 @@ Each document record contains:
 | `saved` | Whether the record refers to published content, including persistence failures |
 | `skip_reason` | `verified_existing`, `explicit`, or `limit`, when skipped |
 | `error` | Controlled error summary; raw transport/custom-fetcher errors are never serialized |
+| `naming` | Optional source (`ai` or `deterministic`), accepted short label or controlled fallback reason, strategy, call count and limited usage metadata; absent on older/AI-disabled records |
 
 Neither source/request URLs nor expiring signed URLs are persisted. Stable
 identity follows the fetcher's canonicalization rules, including removal of known
@@ -173,6 +190,10 @@ Records with the same identity and filename are updated; distinct saved versions
 are retained. A latest failed/skipped attempt with no filename does not remove a
 saved version. Repeated failed attempts replace the previous non-file attempt.
 The file is a compact local state snapshot, not an immutable audit history.
+Version-1 manifests and receipts without `naming` remain valid. Unsupported
+versions are still rejected without rewriting. A recovery receipt retains the
+selected filename and naming outcome, so reconciliation does not call a provider.
+Verified repeats, including prior naming fallbacks, skip both fetch and naming.
 
 Manifest changes stage a new complete, synced, closed JSON file and replace the
 recognized manifest under the case lock. The first manifest is published without
@@ -214,6 +235,13 @@ portable Go cannot forcibly interrupt a blocked kernel disk write or `Sync`.
 Once publication succeeds, manifest/cleanup work completes even if cancellation
 arrives. Already saved PDFs remain usable. Hosts must use a fetcher honoring the
 existing context and sequential writer contract.
+If cancellation happens during optional naming after independent verification,
+the provider call is canceled and the already complete PDF is published under
+the deterministic filename through the bounded local receipt/link/manifest path.
+The batch still reports cancellation and pending documents remain canceled.
+Portable Go cannot forcibly interrupt a blocked kernel disk operation in that
+finalization path. A remote request canceled after transmission has an uncertain
+billing window; the service does not replay naming for a verified saved PDF.
 
 ## Verification
 

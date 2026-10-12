@@ -399,7 +399,7 @@ func main() {
 					licenseID = "LicenseRef-Rijndael"
 				}
 				if licenseID != "" {
-					extracted = append(extracted, object{"licenseId": licenseID, "extractedText": m.Text, "seeAlsos": []string{"https://github.com/golang/go/blob/go1.26.8/" + m.Path}})
+					extracted = append(extracted, object{"licenseId": licenseID, "extractedText": m.Text, "seeAlsos": []string{"https://github.com/golang/go/blob/go1.26.9/" + m.Path}})
 				}
 			}
 		}

@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -162,7 +165,7 @@ func browserAllocatorOptions(info BrowserInfo, headless bool, profile string) []
 	// Use only the required flags rather than defaults that disable site isolation
 	// and phishing protection. Explicit false also prevents chromedp's root-user
 	// fallback from silently disabling the sandbox on Linux.
-	return []chromedp.ExecAllocatorOption{
+	opts := []chromedp.ExecAllocatorOption{
 		chromedp.ExecPath(info.ExecutablePath),
 		chromedp.UserDataDir(profile),
 		chromedp.NoFirstRun,
@@ -172,6 +175,18 @@ func browserAllocatorOptions(info BrowserInfo, headless bool, profile string) []
 		chromedp.Flag("remote-debugging-address", "127.0.0.1"),
 		chromedp.Flag("remote-debugging-port", "0"),
 	}
+	if edgeNeedsCompatLayerClear(info.ExecutablePath) {
+		// Edge may relaunch itself when it inherits an application compatibility
+		// layer such as RunAsInvoker. chromedp needs the original process to stay
+		// attached while it reads the DevTools endpoint. Clear the layer only in
+		// the Edge child; leave the application's environment unchanged.
+		opts = append(opts, chromedp.Env("__COMPAT_LAYER="))
+	}
+	return opts
+}
+
+func edgeNeedsCompatLayerClear(executablePath string) bool {
+	return runtime.GOOS == "windows" && strings.EqualFold(filepath.Base(executablePath), "msedge.exe") && os.Getenv("__COMPAT_LAYER") != ""
 }
 
 func launchChromedp(ctx context.Context, info BrowserInfo, headless bool, profile string) (context.Context, func(), error) {

@@ -90,6 +90,16 @@ timeout, and relevant troubleshooting steps. They omit raw browser stderr, page
 URLs, and profile contents; callers should display the returned error rather than
 logging its underlying cause. No browser output is forwarded to application logs.
 
+On Windows, an inherited `__COMPAT_LAYER` value such as `RunAsInvoker` can make
+Edge immediately relaunch into a child process. The original process then exits
+before chromedp receives its DevTools address. For Edge only, the runtime clears
+that variable in the new browser process; the application, user, and machine
+environments are unchanged. This was reproduced with an isolated headless Edge
+profile and verified by the browser fixture. For an older build, clearing the
+variable in the launching PowerShell process with
+`Remove-Item Env:__COMPAT_LAYER -ErrorAction SilentlyContinue` is a temporary
+workaround; it does not alter Windows environment settings.
+
 ## Browser smoke test
 
 Ordinary unit tests use injected discovery/launch probes. An opt-in smoke test

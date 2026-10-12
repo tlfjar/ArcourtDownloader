@@ -9,6 +9,9 @@ Runtime use requires the executable, Microsoft Edge or Google Chrome, and a writ
 local output directory. It requires **no Go installation, GitHub authentication,
 or repository checkout**. The [Windows desktop shell](desktop-architecture.md)
 uses the same service. Commands are in [testing](testing.md) and [releasing](releasing.md).
+The CLI keeps its existing deterministic filenames and makes no AI provider calls.
+Optional AI naming is a desktop setting and an opt-in request in the reusable Go
+core; see [AI document naming](ai-document-naming.md).
 
 ## Preview, select, download in Windows PowerShell
 

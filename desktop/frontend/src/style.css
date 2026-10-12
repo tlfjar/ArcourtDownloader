@@ -13,12 +13,17 @@ h2 { margin: 0 0 12px; font-size: 18px; }
 p { line-height: 1.5; margin: 10px 0; }
 label { display: block; font-weight: 600; }
 input:not([type=checkbox]) { display: block; width: 100%; font: inherit; border: 1px solid #aab9c6; border-radius: 5px; padding: 10px 12px; margin: 7px 0 12px; }
+select { display: block; width: 100%; font: inherit; border: 1px solid #aab9c6; border-radius: 5px; padding: 10px 12px; margin: 7px 0 12px; background: white; }
+fieldset { border: 1px solid #d9e2eb; border-radius: 6px; margin: 16px 0; padding: 14px 16px; }
+legend, h3 { font-size: 15px; font-weight: 650; }
+#credential-form { border-top: 1px solid #d9e2eb; margin-top: 20px; padding-top: 16px; }
+#credential-form h3 { margin: 0; }
 input[type=checkbox] { width: 19px; height: 19px; accent-color: #17675f; }
 button { cursor: pointer; border: 1px solid #17675f; background: #17675f; color: white; border-radius: 6px; padding: 10px 16px; font: 600 14px "Segoe UI", sans-serif; white-space: nowrap; }
 button.quiet { color: #244760; background: #f5f8fb; border-color: #c4d1dd; }
 button:hover:enabled { filter: brightness(.94); }
 button:disabled { opacity: .48; cursor: default; }
-button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid #d59631; outline-offset: 3px; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid #d59631; outline-offset: 3px; }
 .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 240px; }
 .row h2 { margin-bottom: 0; }

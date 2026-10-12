@@ -19,6 +19,32 @@ func TestDesktopStartup(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := t.TempDir()
+	// WebView2 can finish writing its cache just after the app exits. Remove
+	// this test-owned profile with a bounded retry before TempDir's final
+	// cleanup, so a transient cache write does not fail the startup fixture.
+	t.Cleanup(func() {
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			err := os.RemoveAll(base)
+			if err == nil {
+				time.Sleep(200 * time.Millisecond)
+				_, statErr := os.Stat(base)
+				if os.IsNotExist(statErr) {
+					return
+				}
+				if statErr != nil {
+					err = statErr
+				} else {
+					err = fmt.Errorf("profile directory was recreated")
+				}
+			}
+			if time.Now().After(deadline) {
+				t.Errorf("WebView2 test profile cleanup did not settle: %v", err)
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	})
 	for _, dir := range []string{"Roaming", "Local"} {
 		if err := os.Mkdir(filepath.Join(base, dir), 0700); err != nil {
 			t.Fatal(err)

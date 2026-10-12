@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -225,5 +226,28 @@ func TestBrowserAllocatorFlags(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEdgeCompatibilityLayerScope(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows Edge compatibility layer behavior")
+	}
+	t.Setenv("__COMPAT_LAYER", "RunAsInvoker")
+	for _, tc := range []struct {
+		path string
+		want bool
+	}{
+		{`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`, true},
+		{`C:\Program Files (x86)\Microsoft\Edge\Application\MSEDGE.EXE`, true},
+		{`C:\Program Files\Google\Chrome\Application\chrome.exe`, false},
+	} {
+		if got := edgeNeedsCompatLayerClear(tc.path); got != tc.want {
+			t.Errorf("edgeNeedsCompatLayerClear(%q) = %t, want %t", tc.path, got, tc.want)
+		}
+	}
+	t.Setenv("__COMPAT_LAYER", "")
+	if edgeNeedsCompatLayerClear(`C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`) {
+		t.Fatal("no compatibility layer needs to be cleared")
 	}
 }

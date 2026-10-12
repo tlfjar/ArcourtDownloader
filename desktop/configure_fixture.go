@@ -67,7 +67,7 @@ func configure(_ app.PreferenceStore) (app.Factory, app.PreferenceStore, func())
 		panic(err)
 	}
 	store := app.PreferenceStore{Path: filepath.Join(dir, "settings.json")}
-	if err := store.Save(app.Preferences{CaseURLTemplate: server.URL + "/case/{case_number}"}); err != nil {
+	if err := store.Save(app.Preferences{CaseURLTemplate: server.URL + "/case/{case_number}", BrowserOverride: os.Getenv("ARCOURT_BROWSER_EXECUTABLE")}); err != nil {
 		panic(err)
 	}
 	factory := func(p app.Preferences) (app.Service, func() error, string, error) {

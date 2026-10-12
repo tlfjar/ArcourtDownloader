@@ -18,7 +18,23 @@
         <p class="hint">Include {case_number}. Use a public page address without credentials or signed links.</p>
         <label>Browser override <input id="browser" placeholder="Automatic Edge / Chrome detection" autocomplete="off" spellcheck="false"></label>
         <label>Preferred output folder <input id="output-setting" placeholder="Choose an existing local folder" autocomplete="off" spellcheck="false"></label>
+        <fieldset>
+          <legend>Optional AI document names</legend>
+          <label class="check"><input id="naming-enabled" type="checkbox"> Enable AI naming for newly downloaded PDFs</label>
+          <label>Provider <select id="naming-provider"><option value="">Choose a provider</option><option value="openai">OpenAI</option><option value="xai">xAI</option><option value="anthropic">Anthropic</option><option value="google">Google</option></select></label>
+          <label>Model ID <input id="naming-model" placeholder="Enter a model available to your account" autocomplete="off" spellcheck="false" maxlength="128"></label>
+          <p id="naming-disclosure" class="hint"></p>
+          <label class="check"><input id="naming-consent" type="checkbox"> I agree to send bounded text from selected documents to this recipient.</label>
+          <p class="hint">A selected, complete PDF is inspected locally after download. Only a bounded opening-page text excerpt is sent, which may still contain sensitive information. The PDF itself is not uploaded. API charges may apply. Naming failures use the ordinary filename; scanned pages without usable text do too. Review the provider's own privacy terms before enabling.</p>
+        </fieldset>
         <button id="save-settings" type="submit">Save settings</button>
+      </form>
+      <form id="credential-form">
+        <h3>Provider API key</h3>
+        <p id="credential-status" role="status"></p>
+        <label>API key <input id="naming-key" type="password" autocomplete="off" spellcheck="false" placeholder="Key is saved in Windows Credential Manager"></label>
+        <div class="row"><button id="save-credential" type="submit">Save or replace key</button><button id="remove-credential" type="button" class="quiet">Remove key</button></div>
+        <p class="hint">Save the provider above first. The key is stored for this Windows user and is never shown again here.</p>
       </form>
       <p id="browser-info" class="path"></p><p class="hint">WebView2 displays this app. The Arkansas OPAD template reads public case data directly; other templates use Edge or Chrome with an isolated temporary profile.</p>
       <p id="diagnostic" role="status"></p>
@@ -45,11 +61,11 @@
     <section aria-labelledby="output-title">
       <div class="row"><h2 class="grow" id="output-title">4. Save PDFs</h2><button id="choose-folder" class="quiet">Choose output folder…</button></div>
       <p id="output-path" class="path">No output folder chosen.</p>
-      <div class="row"><button id="download" disabled>Download selected</button><button id="open-folder" class="quiet" disabled>Open output folder</button><span class="hint">Existing verified files are skipped.</span></div>
+      <div class="row"><button id="download" disabled>Download selected</button><button id="open-folder" class="quiet" disabled>Open output folder</button><span class="hint">Existing verified files are skipped.</span></div><p id="naming-notice" class="hint" role="status"></p>
     </section>
     <section id="results" hidden aria-labelledby="result-title"><h2 id="result-title">Download results</h2><p id="totals"></p><p id="result-path" class="path"></p><div class="table-wrap"><table><thead><tr><th>Outcome</th><th>Document / file</th><th>Details</th></tr></thead><tbody id="result-documents"></tbody></table></div></section>
   </main>
-  <footer>Local files only · No account or telemetry · Select All applies to the displayed preview. <span id="about-version" aria-label="About Arcourt Downloader">Version loading…</span></footer>
+  <footer>PDFs saved locally · Optional AI naming sends bounded text to your selected provider · No app telemetry. <span id="about-version" aria-label="About Arcourt Downloader">Version loading…</span></footer>
   <script type="module" src="app.js"></script>
 </body>
 </html>

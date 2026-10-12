@@ -4,6 +4,8 @@ go 1.26.0
 
 require (
 	github.com/chromedp/chromedp v0.15.1
+	github.com/giraffesyo/pdf v0.7.0
+	github.com/zendev-sh/goai v0.10.6
 	golang.org/x/sys v0.42.0
 )
 
