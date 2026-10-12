@@ -11,12 +11,24 @@ AI naming is off by default. It runs only for a newly downloaded, selected PDF a
 
 The selected non-secret settings and credential are captured when the download job starts. Settings and credential changes are disabled while a job is busy. Requests go directly to the selected provider's documented HTTPS route:
 
-| Provider | Recipient | Current evaluation status |
-| --- | --- | --- |
-| [OpenAI](https://developers.openai.com/api/reference/resources/responses/methods/create) | `https://api.openai.com/v1/responses` | Live synthetic runs completed for the named models below. On the held-out `synthetic-court-v6` corpus, `gpt-6-luna` met every declared gate under `title-excerpt-v3`; no claim is made for other model IDs or for real court documents. |
-| [xAI](https://docs.x.ai/developers/rest-api-reference/inference/chat-completions) | `https://api.x.ai/v1/chat/completions` | **Untested live: no xAI API key was available.** Only injected connector/request tests have run. |
-| [Anthropic](https://platform.claude.com/docs/en/api/messages/create) | `https://api.anthropic.com/v1/messages` | **Untested live: no Anthropic API key was available.** Only injected connector/request tests have run. |
-| [Google](https://ai.google.dev/api/generate-content) | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | **Untested live: no Google API key was available.** Only injected connector/request tests have run. |
+| Provider | Recipient | Connector status | Live naming quality |
+| --- | --- | --- | --- |
+| [OpenAI](https://developers.openai.com/api/reference/resources/responses/methods/create) | `https://api.openai.com/v1/responses` | Implemented; injected connector/request tests pass | **Evaluated.** `gpt-6-luna` met every declared gate on the held-out `synthetic-court-v6` corpus under `title-excerpt-v3`. No claim for other model IDs or real court documents. |
+| [xAI](https://docs.x.ai/developers/rest-api-reference/inference/chat-completions) | `https://api.x.ai/v1/chat/completions` | Implemented; injected connector/request tests pass | **Experimental: unmeasured.** No xAI API key was available, so no live quality run exists. |
+| [Anthropic](https://platform.claude.com/docs/en/api/messages/create) | `https://api.anthropic.com/v1/messages` | Implemented; injected connector/request tests pass | **Experimental: unmeasured.** No Anthropic API key was available, so no live quality run exists. |
+| [Google](https://ai.google.dev/api/generate-content) | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | Implemented; injected connector/request tests pass | **Experimental: unmeasured.** No Google API key was available, so no live quality run exists. |
+
+A connector being implemented and transport-tested says only that requests are
+built, sent, and parsed correctly against that provider's documented route. It
+does not say the chosen model produces good filenames. Every provider passes
+through the same local extraction limits, the same `title-excerpt-v3` label
+validator, the same filename sanitization, and the same deterministic fallback,
+so an unmeasured provider cannot bypass those protections; the realistic risk of
+selecting one is a lower rate of useful labels, not an unsafe filename. There is
+no automatic cross-provider fallback: a failure with the selected provider keeps
+the deterministic name rather than sending the excerpt somewhere else. Model
+choice matters as much as provider choice, and an unevaluated model ID on an
+evaluated provider is equally unmeasured.
 
 The connector selection is detailed in [the connector evaluation](ai-connector-evaluation.md). There is no configured gateway or app telemetry. Provider privacy, retention, and training practices depend on the provider and account; review the provider's current terms before enabling this feature.
 
@@ -81,7 +93,7 @@ Live evaluation against synthetic fixtures requires an explicit provider/model, 
 
 Its report path is `build/naming-benchmark-live.json`. The script passes the deliberately prompted key to its Go test child through a temporary process environment variable, then restores the previous environment state; it does not write the key to the report. For an unattended run, `-KeyEnvironmentVariable <name>` reads the key from a separately named process environment variable instead of prompting, which keeps the key out of the command line and the shell history; the variable must be set deliberately for that run, and `ARCOURT_BENCH_KEY` itself is rejected because the script sets it. The script accepts at most 512 transmitted calls and 1 MiB of serialized request bodies across the run; the adapter's per-document limits still apply. The current 59-case, three-strategy corpus can transmit 153–204 calls; set `-MaxCalls 205` so the runner can also finish the final no-call scan cases. Set both caps deliberately for the intended run; a partial budget is a partial evaluation. Confirm that every strategy has 59 cases before using its quality status or selected strategy.
 
-The quality gates were declared before measurement: at least 99% accepted-name precision, 90% correct-label coverage on nameable supported-text fixtures, no material clear-title type/party/amendment errors, and no more than a two percentage point coverage loss against the bounded baseline. The repository's `docs/issue-8-plan.md` retains that declaration. Offline replay and injected HTTP tests establish contracts and regression behavior; they do not measure real-provider naming quality. The OpenAI `gpt-4.1-mini` and `gpt-6-luna` results dated October 8 through 12, 2026 measured the earlier `title-excerpt-v1` prompt and validator; the October 13 results measure `title-excerpt-v2` and `title-excerpt-v3`. All of them are OpenAI-specific. xAI, Anthropic, and Google remain untested live because no API keys were available.
+The quality gates were declared before measurement: at least 99% accepted-name precision, 90% correct-label coverage on nameable supported-text fixtures, no material clear-title type/party/amendment errors, and no more than a two percentage point coverage loss against the bounded baseline. The repository's `docs/issue-8-plan.md` retains that declaration. Offline replay and injected HTTP tests establish contracts and regression behavior; they do not measure real-provider naming quality. The OpenAI `gpt-4.1-mini` and `gpt-6-luna` results through the October 12, 2026 diagnostic run measured the earlier `title-excerpt-v1` prompt and validator; the later October 12 results measure `title-excerpt-v2` and `title-excerpt-v3`. All of them are OpenAI-specific. xAI, Anthropic, and Google remain untested live because no API keys were available.
 
 The offline `synthetic-court-v3` replay report contains 59 generated PDFs: 43 readable, 8 ambiguous, and 8 image-only scans, with 14 cases assigned to its synthetic held-out split. Its audited result was:
 
@@ -211,7 +223,7 @@ A second `gpt-6-luna` v4 live run used the same frozen corpus and scorer with th
 
 The report at `build/naming-benchmark-openai-luna6-v4-diagnostic.json` classifies the repeated `Entered Order Vacating Hearing` rejection as `unsupported_heading`: the reply omitted a distinction required by the selected heading. The repeated `Notice of Substitution of Counsel` rejection is `unsafe_non_ascii`. Neither reply is silently converted into a filename. Successful PDF downloads retain the ordinary docket-derived filename and their naming fallback reason; the desktop now presents that reason in plain language. The original quality gates remain unmet for the production strategy, and no general minimum-context winner is claimed.
 
-### Strategy v2 and the v5 corpus (October 13, 2026)
+### Strategy v2 and the v5 corpus (October 12, 2026, later the same day)
 
 `title-excerpt-v2` tightened the validator so an accepted label must retain every material word of the selected heading, not merely a short list of qualifiers. That rule was written while reading v4 titles and v4 rejections, so v4 could no longer serve as held-out evidence for it. Two `gpt-6-luna` runs were made at clean revision `9bb72eb`: a controlled v4 rerun, and a first run of the new `synthetic-court-v5` corpus, which was committed before any model saw it. Each strategy completed all 48 cases, abstained on all 8 ambiguous cases, fell back on all 8 scans, and used 40 transmitted calls under a 241-call, 1 MiB cap.
 
@@ -226,7 +238,7 @@ The report at `build/naming-benchmark-openai-luna6-v4-diagnostic.json` classifie
 
 The v4 rerun is a controlled comparison against the same model and budgets as the October 9 `title-excerpt-v1` run, not new acceptance evidence; its corpus informed the rule being tested. The held-out v5 run is the meaningful result, and it recorded zero material errors: no accepted label dropped a material heading word or misstated a type, party, ruling, or amendment. What it did expose is that two strategies accepted labels that kept every material word while rearranging them, turning `Brief in Reply to Opposition` into `Reply Brief to Opposition` and `Entered Order Confirming Sale` into `Order Confirming Sale (Entered)`. Each names a different filing than the page does, so those acceptances were defects in the validator rather than scoring strictness.
 
-### Strategy v3 and the v6 corpus (October 13, 2026)
+### Strategy v3 and the v6 corpus (October 12, 2026, later the same day)
 
 `title-excerpt-v3` matches the selected heading's material words against the label as an ordered subsequence instead of an unordered set, and the prompt asks for heading order. Articles, prepositions, and a possessive filing-party role stay optional, so concise and possessive-role labels still pass, but any rearrangement now falls back to the deterministic docket-derived filename. Because that rule was written in response to v5 output, v5 is no longer held-out evidence for it, and the 48-case `synthetic-court-v6` corpus was authored and committed at clean revision `90fcd94` before any model saw it. Its titles restate no v3, v4, or v5 label, which a test enforces.
 
@@ -241,3 +253,24 @@ All three strategies met every declared gate on `build/naming-benchmark-openai-l
 A confirming v5 rerun under `title-excerpt-v3` is recorded at `build/naming-benchmark-openai-luna6-v5-v3strategy-live.json`. Precision rose to 100% on all three strategies, from 96.67%, 100%, and 96.77%, while correct readable labels moved to 29/32, 30/32, and 31/32 from 29/32, 31/32, and 30/32. The reordered labels that v2 accepted are now fallbacks. That rerun is a controlled check that the defect is closed, not held-out evidence, because v5 results motivated the rule.
 
 These are single runs of one OpenAI model against generated fixtures. They do not establish accuracy on real court documents, do not transfer to other providers or model IDs, and the one-case differences between strategies remain within ordinary model variation rather than evidence of an excerpt-size effect.
+
+## Evaluating an additional provider or model
+
+Only OpenAI `gpt-6-luna` has completed this evaluation. To qualify another provider or model, run the same frozen procedure rather than reusing an already-measured corpus:
+
+1. Smoke-test account access and request compatibility with a single transmitted call and a tiny byte cap.
+2. Author a new corpus in the v6 shape whose labels restate no earlier corpus label, and commit it, with its aliases and scoring rule, before the model sees it.
+3. Run the live benchmark at a clean worktree so the report records an exact source revision and `worktree_dirty: false`.
+4. Record the per-strategy coverage, precision, material errors, calls, bytes, and usage, and state plainly whether each declared gate was met or failed.
+
+Interpret the outcome by failure mode rather than by score alone:
+
+| Observed outcome | Meaning | Action |
+| --- | --- | --- |
+| Low coverage, precision intact, no material errors | The validator is refusing weak replies and files keep deterministic names | Record reduced usefulness; the safety boundary is working |
+| An accepted label that is wrong | A validator defect, not scorer strictness | Tighten the shared validator, then retire that corpus and mint a new one |
+| A material error (wrong type, party, ruling, or amendment) | The dangerous failure mode | Fix the validator, or stop offering that provider/model, before shipping |
+
+A corpus is held-out evidence only for the validator that existed before anyone read its output. Once a result motivates any change to extraction, prompting, or validation, that corpus becomes a controlled comparison and a new corpus is required for the next acceptance claim. v4 was retired this way when `title-excerpt-v2` was written, and v5 when `title-excerpt-v3` was written.
+
+A provider that misses the coverage target may still remain selectable as experimental, because naming is off by default, the deterministic filename is always the safe outcome, and no cross-provider fallback exists. A provider or model that produces accepted material errors should not remain selectable on documentation alone; the validator must block the failure or that combination should be withdrawn.

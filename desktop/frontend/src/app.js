@@ -1,4 +1,4 @@
-import { SnapshotGate, canDownload, totals, doneCount, namingDetail } from './state.js';
+import { SnapshotGate, canDownload, totals, doneCount, namingDetail, namingQualityNote } from './state.js';
 
 const $ = id => document.getElementById(id);
 const api = window.go.main.Desktop;
@@ -16,9 +16,10 @@ const namingRecipients = {
 };
 
 function updateNamingDisclosure() {
-  const recipient = namingRecipients[$('naming-provider').value];
+  const provider = $('naming-provider').value;
+  const recipient = namingRecipients[provider];
   $('naming-disclosure').textContent = recipient
-    ? `Direct recipient: ${recipient[0]} at ${recipient[1]}. No intermediary is configured. A different recipient requires fresh consent.`
+    ? `Direct recipient: ${recipient[0]} at ${recipient[1]}. No intermediary is configured. A different recipient requires fresh consent. ${namingQualityNote(provider, $('naming-model').value)}`
     : 'Choose a provider to review the direct recipient before consenting.';
 }
 
@@ -167,6 +168,7 @@ $('settings-toggle').addEventListener('click', () => { $('settings').hidden = !$
 $('settings-form').addEventListener('input', () => { settingsDirty = true; });
 $('naming-provider').addEventListener('change', () => { $('naming-consent').checked = false; $('naming-key').value = ''; settingsDirty = true; updateNamingDisclosure(); renderControls(); });
 $('naming-key').addEventListener('input', renderControls);
+$('naming-model').addEventListener('input', updateNamingDisclosure);
 $('settings-form').addEventListener('submit', event => {
   event.preventDefault();
   const provider = $('naming-provider').value;

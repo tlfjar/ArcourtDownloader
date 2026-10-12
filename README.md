@@ -68,6 +68,14 @@ naming uses the normal deterministic filename; the PDF still saves. Already
 verified downloads do not incur another naming call. See the [AI naming guide](docs/ai-document-naming.md)
 for limits, privacy boundaries, fallbacks, and evidence status.
 
+All four provider connectors are covered by local request and response tests,
+but only OpenAI `gpt-6-luna` has completed this project's live naming-quality
+evaluation against held-out synthetic filings. Naming quality for xAI,
+Anthropic, Google, and every other model ID is unmeasured, so those selections
+are experimental. The safety behavior is the same for all of them: the label is
+validated locally and an unusable result keeps the deterministic filename. The
+app never silently switches providers.
+
 ## Use the command line
 
 The included `arcourt-download.exe` can preview a case, then download specific

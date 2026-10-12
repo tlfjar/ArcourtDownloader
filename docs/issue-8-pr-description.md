@@ -8,22 +8,56 @@ Add optional bounded AI PDF document naming (issue #8)
 
 - Add a reusable Go naming path after independent staged-PDF validation and before receipt/no-overwrite publication. It inspects at most two opening pages locally, sends a bounded title-centered text excerpt, and preserves the original bytes, docket description, recovery, and verified-repeat behavior.
 - Support OpenAI, xAI, Anthropic, and Google through pinned GoAI request/response paths with direct HTTPS destinations, bounded complete payloads, no SDK retries, and controlled fallbacks. Image-only and unreadable PDFs keep deterministic filenames.
-- Add default-off desktop controls, exact-recipient consent, model IDs, per-provider Windows Credential Manager keys, credential status/actions, and per-document naming outcomes. The CLI remains AI-free by default.
+- Validate every model reply with `title-excerpt-v3`, which requires the selected heading material words to survive into the label in heading order. Anything else, including abstention, unsafe characters, a dropped material word, or a rearranged title, keeps the deterministic docket-derived filename.
+- Add default-off desktop controls, exact-recipient consent, model IDs, per-provider Windows Credential Manager keys, credential status/actions, and per-document naming outcomes. The consent disclosure now states whether the selected provider and model have a completed naming-quality evaluation. The CLI remains AI-free by default.
 - Add synthetic extraction/provider/filesystem/desktop regressions, a reproducible offline replay benchmark and opt-in budgeted live synthetic mode, dependency/license notices, user documentation, and release payload checks.
+
+## Naming quality evidence
+
+Quality gates were declared before measurement: at least 99% accepted-name precision, at least 90% correct-label coverage on nameable supported-text fixtures, zero material type/party/amendment errors, and no more than two percentage points of coverage loss against the same-model bounded baseline.
+
+The final held-out run (`build/naming-benchmark-openai-luna6-v6-live.json`, clean source revision `90fcd94`, OpenAI `gpt-6-luna`) met every gate in all three request strategies:
+
+| Strategy | Correct readable labels | Accepted-name precision | Material errors | Calls | Complete request bytes | Gate |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Bounded 4,096-character baseline | 31/32 (96.88%) | 100% | 0 | 40 | 28,258 | Met |
+| Targeted 512-character excerpt | 31/32 (96.88%) | 100% | 0 | 40 | 28,258 | Met |
+| Targeted excerpt with expansion (production) | 31/32 (96.88%) | 100% | 0 | 40 | 28,258 | Met |
+
+Each strategy completed all 48 cases, abstained on all 8 ambiguous documents, and fell back on all 8 image-only scans. There is no coverage spread between the baseline and the production strategy, so the two-point non-inferiority margin is satisfied. The single readable miss is identical across strategies: the model answered `ABSTAIN` on `EXHIBIT D`, so that PDF keeps its docket-derived filename. A refusal to guess is the intended behavior, not a naming error.
+
+## How the validator reached that result
+
+The earlier `title-excerpt-v1` validator checked only a hardcoded qualifier list, so a paraphrase could drop a material subject word and still be accepted. `title-excerpt-v2` required every material heading word to survive. Its first held-out run on `synthetic-court-v5` recorded zero material errors but exposed a real defect: two strategies accepted labels that kept every material word while rearranging them, turning `Brief in Reply to Opposition` into `Reply Brief to Opposition` and `Entered Order Confirming Sale` into `Order Confirming Sale (Entered)`. Each names a different filing than the page does.
+
+`title-excerpt-v3` closes that gap by matching the heading material words as an ordered subsequence of the label, with articles, prepositions, and a possessive filing-party role still optional. A confirming v5 rerun raised precision to 100% in all three strategies; the reordered labels are now fallbacks.
+
+Each time a run output motivated a validator change, that corpus was retired as held-out evidence and a new one was authored and committed before the next measurement. v4 was retired for v2, and v5 for v3. A test enforces that the v6 corpus restates no earlier corpus label.
+
+## Provider status
+
+| Provider | Connector | Live naming quality |
+| --- | --- | --- |
+| OpenAI | Implemented; injected request/response tests pass | Evaluated. `gpt-6-luna` met every gate on held-out `synthetic-court-v6`. |
+| xAI | Implemented; injected request/response tests pass | Experimental: unmeasured. No API key was available. |
+| Anthropic | Implemented; injected request/response tests pass | Experimental: unmeasured. No API key was available. |
+| Google | Implemented; injected request/response tests pass | Experimental: unmeasured. No API key was available. |
+
+All four connectors share the same local extraction limits, the same label validator, the same filename sanitization, and the same deterministic fallback, so an unmeasured provider cannot bypass those protections; the realistic risk of selecting one is a lower rate of useful labels, not an unsafe filename. There is no automatic cross-provider fallback. The README, the naming guide, and the desktop consent disclosure all state which provider and model have been evaluated, and the naming guide documents the procedure for qualifying another one.
 
 ## Verification
 
 - Passed `./scripts/check.ps1`, `./scripts/build-desktop.ps1`, both module `check-vulnerabilities.ps1` runs, `./scripts/generate-notices.ps1 -Check`, `./scripts/benchmark-naming.ps1`, and `./scripts/package-windows.ps1` on Windows/amd64. Packaging used reviewed Go 1.26.8; development checks used Go 1.27.1.
 - Passed `go test -race ./...` in both Go modules with `CGO_ENABLED=1` and MSYS2 UCRT64 GCC 16.2.0 on Windows/amd64.
-- Passed `./scripts/check-fixtures.ps1 -Desktop` with installed Chrome and with default Edge on Windows 11: browser/CLI fixtures, native Wails GUI fixture, and native startup. The GUI fixture requires an actual case-header mismatch before crediting that test. Edge's former process-only compatibility-layer relaunch is handled in the Edge child environment; the startup fixture retries cleanup of its own WebView2 cache.
-- Offline `synthetic-court-v3` replay: 59 PDFs (43 readable, 8 ambiguous, 8 scans; 14 held out). Baseline 43/43 readable correct in 51 calls and 29,286 serialized request bytes; small 42/43 in 51 calls and 28,581 bytes; small with expansion 43/43 in 52 calls and 29,910 bytes. All accepted replay labels were correct by deterministic fixture comparison; ambiguous and scanned cases fell back. These are replay-contract results, not live model quality.
-- Operator-run OpenAI `gpt-4.1-mini` synthetic live comparison: all 59 cases completed for each strategy, with 154 transmitted calls and provider usage for each. Baseline: 17/43 readable correct, 94.44% accepted-name precision, 29,592 complete request bytes. Small: 20/43, 95.24%, 28,887 bytes. Production small plus expansion: 15/43, 88.24%, 30,222 bytes. All 8 ambiguous cases abstained and all 8 scans fell back per strategy.
-- Operator-run OpenAI `gpt-6-luna` synthetic live comparison: all 59 cases completed for each strategy, with 154 transmitted calls and provider usage for each. Baseline: 33/43 readable correct, 84.62% accepted-name precision, 31,020 complete request bytes. Small: 32/43, 86.49%, 30,315 bytes. Production small plus expansion: 31/43, 81.58%, 31,678 bytes. All 8 ambiguous cases abstained and all 8 scans fell back per strategy. Luna's summed per-case time was 194.7 seconds versus 133.9 seconds for the prior model, including local and network work.
+- Passed `./scripts/check-fixtures.ps1 -Desktop` with installed Chrome and with default Edge on Windows 11: browser/CLI fixtures, native Wails GUI fixture, and native startup. The GUI fixture requires an actual case-header mismatch before crediting that test.
+- Offline replays validate extraction, request-building, and scoring contracts only: `synthetic-court-v3` 43/43 readable per strategy; `synthetic-court-v5` 32/32; `synthetic-court-v6` 32/32 at 26,898 complete request bytes.
+- Live synthetic runs used only generated fixtures, finite call and byte caps, and a key supplied at run time that is never written to a report or into the repository.
 
-## Open evidence
+## Open evidence and limits
 
-- Offline small loses 2.326 percentage points of readable coverage versus baseline, exceeding the declared two-point non-inferiority margin; expansion restores that label but costs 624 more serialized bytes than baseline. In both OpenAI live runs, all three strategies fail the declared 99% precision and 90% readable-coverage gates; production expansion also trails its same-model baseline by 4.65 percentage points. No minimum-context winner was selected. Many Luna labels differ from the benchmark's single exact expected string while retaining its required type/party/ruling tokens. The scoring rubric needs independent review and a new held-out evaluation before quality claims or tuning. The earlier model's dominant `unsafe_result` fallback also needs bounded synthetic-only diagnosis. Other provider quality and performance on court/client PDFs remain unmeasured; the live runs sent only generated synthetic excerpts.
-- Eight distinct Luna wording variants were reviewed against their synthetic source text and recorded as grounded equivalents without rescoring the completed v3 runs. A separate 48-case `synthetic-court-v4` held-out corpus and `predeclared-alias-v1` rule were frozen before evaluation. Its offline replay completed 32/32 simulated readable labels and all ambiguous/scan fallbacks per strategy, establishing contracts only. In the operator's complete `gpt-6-luna` v4 live run, the bounded baseline met the synthetic gates at 29/32 readable correct, 100% accepted-name precision, and 23,555 request bytes. Both targeted strategies failed at 28/32, 96.55%, and 23,510 bytes: one fewer correct label breaches the two-point non-inferiority margin for only 45 bytes saved. Production made no expansion calls. The new cases have straightforward opening titles, so a later unseen layout-stress set is still needed for a general minimum-context claim. The benchmark's baseline selection is not an adopted production default.
-- A human production-GUI walkthrough and current authorized court check were not claimed. The OpenAI live results are synthetic and do not establish reliability on court/client PDFs.
+- The live results are single runs of one OpenAI model against generated fixtures. They do not establish accuracy on real court or client PDFs, and they do not transfer to other providers or model IDs. The one-case differences between strategies stay within ordinary model variation and are not evidence of an excerpt-size effect; no strategy is claimed as a general minimum-context winner, and the benchmark baseline is not an adopted production default.
+- xAI, Anthropic, and Google naming quality is unmeasured because no API keys were available. Those selections ship as experimental.
+- A human production-GUI walkthrough has not been performed; GUI coverage is the automated Wails fixture and startup check. No authorized live court-site check is claimed.
+- Earlier `title-excerpt-v1` and `title-excerpt-v2` runs that failed or exposed defects are retained in the naming guide and plan so the evidence trail shows what changed and why.
 
-See [the naming guide](ai-document-naming.md), [connector evaluation](ai-connector-evaluation.md), and [implementation plan](issue-8-plan.md) for limits, design choices, and evidence. References #8; leave the issue open until the remaining empirical and native-environment gates are reviewed.
+See [the naming guide](ai-document-naming.md), [connector evaluation](ai-connector-evaluation.md), and [implementation plan](issue-8-plan.md) for limits, design choices, and the full evidence history. References #8; leave the issue open until the remaining native-environment and human-review gates are confirmed.

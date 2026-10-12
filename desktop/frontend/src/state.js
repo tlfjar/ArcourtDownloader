@@ -50,3 +50,18 @@ export function namingDetail(n) {
   }
   return 'Standard filename';
 }
+
+// Only provider/model combinations with a completed held-out naming-quality
+// evaluation are presented as measured. Everything else is labeled
+// experimental so an operator is not led to assume untested naming is proven.
+export const namingEvaluatedModels = { openai: ['gpt-6-luna'] };
+
+export function namingQualityNote(provider, model) {
+  const evaluated = namingEvaluatedModels[provider] || [];
+  if (evaluated.includes(String(model ?? '').trim())) {
+    return `Naming quality for ${String(model).trim()} was measured against held-out synthetic filings and met this project's targets. Real court documents were not tested.`;
+  }
+  return evaluated.length
+    ? `Experimental: naming quality for this model is unmeasured. Only ${evaluated.join(', ')} has been evaluated on this provider. An unusable label keeps the standard filename.`
+    : 'Experimental: naming quality for this provider is unmeasured. Requests and responses are tested, but no live naming evaluation has run. An unusable label keeps the standard filename.';
+}
