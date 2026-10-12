@@ -24,8 +24,8 @@
           <label>Provider <select id="naming-provider"><option value="">Choose a provider</option><option value="openai">OpenAI</option><option value="xai">xAI</option><option value="anthropic">Anthropic</option><option value="google">Google</option></select></label>
           <label>Model ID <input id="naming-model" placeholder="Enter a model available to your account" autocomplete="off" spellcheck="false" maxlength="128"></label>
           <p id="naming-disclosure" class="hint"></p>
-          <label class="check"><input id="naming-consent" type="checkbox"> I agree to send bounded text from selected documents to this recipient.</label>
-          <p class="hint">A selected, complete PDF is inspected locally after download. Only a bounded opening-page text excerpt is sent, which may still contain sensitive information. The PDF itself is not uploaded. API charges may apply. Naming failures use the ordinary filename; scanned pages without usable text do too. Review the provider's own privacy terms before enabling.</p>
+          <label class="check"><input id="naming-consent" type="checkbox"> I agree to send bounded text or images from the first two pages of selected documents to this recipient.</label>
+          <p class="hint">A selected, complete PDF is inspected locally after download. A bounded opening-page text excerpt is sent when usable; otherwise, up to two bounded page images are sent. Either may contain sensitive information. The complete PDF is not uploaded. API charges may apply. Naming failures use the ordinary filename. Review the provider's own privacy terms before enabling.</p>
         </fieldset>
         <button id="save-settings" type="submit">Save settings</button>
       </form>
@@ -65,7 +65,7 @@
     </section>
     <section id="results" hidden aria-labelledby="result-title"><h2 id="result-title">Download results</h2><p id="totals"></p><p id="result-path" class="path"></p><div class="table-wrap"><table><thead><tr><th>Outcome</th><th>Document / file</th><th>Details</th></tr></thead><tbody id="result-documents"></tbody></table></div></section>
   </main>
-  <footer>PDFs saved locally · Optional AI naming sends bounded text to your selected provider · No app telemetry. <span id="about-version" aria-label="About Arcourt Downloader">Version loading…</span></footer>
+  <footer>PDFs saved locally · Optional AI naming sends bounded opening-page content to your selected provider · No app telemetry. <span id="about-version" aria-label="About Arcourt Downloader">Version loading…</span></footer>
   <script type="module" src="app.js"></script>
 </body>
 </html>

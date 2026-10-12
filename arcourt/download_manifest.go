@@ -96,7 +96,7 @@ func validNamingOutcome(n *NamingOutcome) bool {
 	}
 	if n.Usage != nil {
 		u := n.Usage
-		if n.Calls == 0 || u.RequestBytes < 0 || u.RequestBytes > 1<<20 || u.InputTokenEstimate < 0 || u.InputTokenEstimate > 1<<20 || u.InputTokens < 0 || u.OutputTokens < 0 || u.CacheReadTokens < 0 || u.CacheWriteTokens < 0 || u.ReasoningTokens < 0 {
+		if n.Calls == 0 || u.RequestBytes < 0 || u.RequestBytes > maxProviderRequestBytes*maxNamingCalls || u.InputTokenEstimate < 0 || u.InputTokenEstimate > maxProviderRequestBytes*maxNamingCalls || u.InputTokens < 0 || u.OutputTokens < 0 || u.CacheReadTokens < 0 || u.CacheWriteTokens < 0 || u.ReasoningTokens < 0 {
 			return false
 		}
 	}

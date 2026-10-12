@@ -27,7 +27,7 @@ test('display preserves separate service outcomes, including partial results', (
 
 test('naming detail distinguishes AI labels and ordinary fallback', () => {
   assert.equal(namingDetail({ source: 'ai', label: 'Motion to Dismiss' }), 'AI label: Motion to Dismiss');
-  assert.equal(namingDetail({ source: 'deterministic', reason: 'image_only' }), 'Standard filename (scanned or image-only PDF)');
+  assert.equal(namingDetail({ source: 'deterministic', reason: 'image_only' }), 'Standard filename (scanned page image unavailable)');
   assert.equal(namingDetail({ source: 'deterministic', reason: 'unsupported_result' }), 'Standard filename (model label did not match the title)');
   assert.equal(namingDetail({ source: 'deterministic', reason: 'unexpected' }), 'Standard filename (naming unavailable)');
   assert.equal(namingDetail({ source: 'deterministic', reason: 'constructor' }), 'Standard filename (naming unavailable)');
@@ -35,8 +35,8 @@ test('naming detail distinguishes AI labels and ordinary fallback', () => {
 });
 
 test('only the evaluated provider and model are presented as measured', () => {
-  assert.match(namingQualityNote('openai', 'gpt-6-luna'), /^Naming quality for gpt-6-luna was measured/);
-  assert.match(namingQualityNote('openai', '  gpt-6-luna  '), /^Naming quality for gpt-6-luna was measured/);
+  assert.match(namingQualityNote('openai', 'gpt-6-luna'), /^Text-excerpt naming quality for gpt-6-luna was measured/);
+  assert.match(namingQualityNote('openai', '  gpt-6-luna  '), /^Text-excerpt naming quality for gpt-6-luna was measured/);
   assert.match(namingQualityNote('openai', 'gpt-4.1-mini'), /^Experimental: naming quality for this model is unmeasured/);
   for (const provider of ['xai', 'anthropic', 'google']) {
     assert.match(namingQualityNote(provider, 'any-model'), /^Experimental: naming quality for this provider is unmeasured/);

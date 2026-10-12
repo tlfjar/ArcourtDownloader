@@ -14,6 +14,12 @@ const namingRecipients = {
   anthropic: ['Anthropic', 'https://api.anthropic.com/v1/messages'],
   google: ['Google', 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'],
 };
+const namingConsentScope = 'opening-pages-v1';
+
+function namingConsentValue(provider) {
+  const recipient = namingRecipients[provider];
+  return recipient ? `${namingConsentScope} ${recipient[1]}` : '';
+}
 
 function updateNamingDisclosure() {
   const provider = $('naming-provider').value;
@@ -79,7 +85,7 @@ function render() {
     $('naming-enabled').checked = !!s.preferences.namingEnabled;
     $('naming-provider').value = s.preferences.namingProvider || '';
     $('naming-model').value = s.preferences.namingModel || '';
-    $('naming-consent').checked = !!s.preferences.namingConsentRecipient && s.preferences.namingConsentRecipient === namingRecipients[s.preferences.namingProvider]?.[1];
+    $('naming-consent').checked = !!s.preferences.namingConsentRecipient && s.preferences.namingConsentRecipient === namingConsentValue(s.preferences.namingProvider);
   }
   updateNamingDisclosure();
   const credentialProvider = $('naming-provider').value;
@@ -174,7 +180,7 @@ $('settings-form').addEventListener('submit', event => {
   const provider = $('naming-provider').value;
   const p = { caseURLTemplate: $('template').value, browserOverride: $('browser').value, outputDirectory: $('output-setting').value,
     namingEnabled: $('naming-enabled').checked, namingProvider: provider, namingModel: $('naming-model').value,
-    namingConsentRecipient: $('naming-consent').checked ? namingRecipients[provider]?.[1] || '' : '' };
+    namingConsentRecipient: $('naming-consent').checked ? namingConsentValue(provider) : '' };
   act(async () => { await api.SavePreferences(p); settingsDirty = false; });
 });
 $('credential-form').addEventListener('submit', event => {

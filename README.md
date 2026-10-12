@@ -8,8 +8,8 @@ It does not provide official notice or guarantee a complete court record.
 The app saves the PDFs you select, plus a local download manifest, on your
 computer. It has no account, application server, telemetry, or cloud storage.
 Court requests go directly to the public site you configure. Optional AI naming,
-off by default, sends a bounded text excerpt from a selected PDF directly to the
-provider you choose.
+off by default, sends bounded content from at most the first two pages of a
+selected PDF directly to the provider you choose.
 
 ## Get started
 
@@ -60,21 +60,22 @@ You can remove it there later. The app shows whether a key is configured but
 never displays a stored key.
 
 For newly downloaded, complete PDFs, the Go core inspects at most the first two
-pages locally and sends only a small title-centered text excerpt. It may make one
-bounded expansion if the first excerpt is insufficient. It does not upload the
-PDF or send source URLs. The excerpt can still contain sensitive material, and
-provider API charges may apply. Image-only, unreadable, ambiguous, or failed
-naming uses the normal deterministic filename; the PDF still saves. Already
-verified downloads do not incur another naming call. See the [AI naming guide](docs/ai-document-naming.md)
-for limits, privacy boundaries, fallbacks, and evidence status.
+pages locally. It sends a small title-centered text excerpt when usable, with one
+bounded expansion if needed; for scanned pages, it instead sends up to two
+bounded page images. It does not upload the complete PDF or send source URLs.
+Either form can contain sensitive material, and provider API charges may apply.
+Unreadable, ambiguous, or failed naming uses the normal deterministic filename;
+the PDF still saves. Already verified downloads do not incur another naming
+call. See the [AI naming guide](docs/ai-document-naming.md) for limits, privacy
+boundaries, fallbacks, and evidence status.
 
-All four provider connectors are covered by local request and response tests,
-but only OpenAI `gpt-6-luna` has completed this project's live naming-quality
-evaluation against held-out synthetic filings. Naming quality for xAI,
-Anthropic, Google, and every other model ID is unmeasured, so those selections
-are experimental. The safety behavior is the same for all of them: the label is
-validated locally and an unusable result keeps the deterministic filename. The
-app never silently switches providers.
+All four provider connectors are covered by local text/image request and
+response tests, but only OpenAI `gpt-6-luna` has completed this project's live
+text-excerpt naming-quality evaluation against held-out synthetic filings.
+Scanned-page image naming, xAI, Anthropic, Google, and every other model ID are
+unmeasured, so those paths are experimental. The safety behavior is the same
+for all of them: the label is validated locally and an unusable result keeps the
+deterministic filename. The app never silently switches providers.
 
 ## Use the command line
 

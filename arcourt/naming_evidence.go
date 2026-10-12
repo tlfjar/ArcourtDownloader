@@ -15,12 +15,21 @@ import (
 	pdf "github.com/giraffesyo/pdf"
 )
 
+// NamingImage is an encoded opening-page image held only for one naming call.
+// It is never persisted in a manifest or receipt.
+type NamingImage struct {
+	MediaType string
+	Data      []byte
+}
+
 // NamingEvidence is a bounded, local view of the opening pages. Reason is empty
-// when text is usable. No PDF bytes, images, URLs, or parser errors leave here.
+// when text or page images are usable. No PDF bytes, URLs, or parser errors
+// leave here.
 type NamingEvidence struct {
 	Small    string // targeted evidence, at most 512 characters / 2 KiB
 	Medium   string // targeted evidence, at most 1,024 characters / 4 KiB
 	Baseline string // opening-page baseline, at most 4,096 characters / 8 KiB
+	Images   []NamingImage
 	Pages    int    // pages inspected, at most two
 	Reason   string // too_large, encrypted, image_only, unreadable, timeout, or canceled
 }
@@ -30,7 +39,7 @@ const (
 	maxNamingReadBytes   = 64 << 20
 	maxNamingPages       = 2
 	maxNamingPageGlyphs  = 16000
-	maxNamingStreamBytes = 1 << 20
+	maxNamingStreamBytes = 4 << 20
 	maxNamingOperators   = 100000
 	maxNamingTextChars   = 4096
 	maxNamingTextBytes   = 8192
@@ -73,14 +82,16 @@ func ExtractNamingEvidence(ctx context.Context, file io.ReaderAt, size int64) (o
 		Pages:           []pdf.PageRange{{First: 1, Last: maxNamingPages}},
 		Concurrency:     1,
 		IgnoreArtifacts: true,
+		IgnoreAnnotationAppearances: true,
+		IncludeImages:   true,
 		Limits: pdf.Limits{
 			MaxStreamBytes:       maxNamingStreamBytes,
 			MaxOperatorsPerPage:  maxNamingOperators,
 			MaxGlyphsPerPage:     maxNamingPageGlyphs,
 			MaxFormDepth:         8,
 			MaxImagesPerPage:     64,
-			MaxImageBytesPerPage: 1 << 20,
-			MaxImagePixels:       1 << 20,
+			MaxImageBytesPerPage: 6 << 20,
+			MaxImagePixels:       maxNamingImagePixels,
 		},
 	})
 	if parseCtx.Err() != nil {
@@ -111,8 +122,14 @@ func ExtractNamingEvidence(ctx context.Context, file io.ReaderAt, size int64) (o
 	all := flattenNamingLines(pages, false)
 	substantive := flattenNamingLines(pages, true)
 	useful := strings.Join(substantive, " ")
-	if len(substantive) == 0 || (utf8.RuneCountInString(useful) < 8 && !namingTypeWord.MatchString(useful)) ||
-		(imageCount > 0 && (utf8.RuneCountInString(useful) < 40 || !namingTypeWord.MatchString(useful))) {
+	textUsable := len(substantive) > 0 &&
+		(utf8.RuneCountInString(useful) >= 8 || namingTypeWord.MatchString(useful)) &&
+		(imageCount == 0 || (utf8.RuneCountInString(useful) >= 40 && namingTypeWord.MatchString(useful)))
+	if !textUsable {
+		out.Images = extractNamingPageImages(parseCtx, doc.Pages)
+		if len(out.Images) > 0 {
+			return out
+		}
 		out.Reason = "unreadable"
 		if imageCount > 0 {
 			out.Reason = "image_only"

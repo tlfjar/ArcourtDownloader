@@ -14,10 +14,10 @@ type benchmarkDiagnosticClient struct {
 	observe func(raw, excerpt string)
 }
 
-func (c benchmarkDiagnosticClient) Generate(ctx context.Context, prompt, excerpt string) (string, NamingUsage, error) {
-	raw, usage, err := c.namingClient.Generate(ctx, prompt, excerpt)
+func (c benchmarkDiagnosticClient) Generate(ctx context.Context, prompt string, input namingInput) (string, NamingUsage, error) {
+	raw, usage, err := c.namingClient.Generate(ctx, prompt, input)
 	if err == nil {
-		c.observe(raw, excerpt)
+		c.observe(raw, input.Text)
 	}
 	return raw, usage, err
 }

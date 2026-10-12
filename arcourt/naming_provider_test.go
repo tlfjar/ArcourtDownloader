@@ -3,6 +3,7 @@ package arcourt
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -92,7 +93,7 @@ func TestNamingProviderPathsAndUsage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			label, usage, err := client.Generate(t.Context(), "System naming instruction", "motion to dismiss")
+			label, usage, err := client.Generate(t.Context(), "System naming instruction", namingInput{Text: "motion to dismiss"})
 			if err != nil || label != "Motion to Dismiss" || calls != 1 {
 				t.Fatalf("label=%q calls=%d error=%v", label, calls, err)
 			}
@@ -124,9 +125,45 @@ func TestNamingOpenAILunaUsesDirectOutput(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			label, _, err := client.Generate(t.Context(), "System naming instruction", "motion to dismiss")
+			label, _, err := client.Generate(t.Context(), "System naming instruction", namingInput{Text: "motion to dismiss"})
 			if err != nil || label != "Motion to Dismiss" {
 				t.Fatalf("label=%q error=%v", label, err)
+			}
+		})
+	}
+}
+
+func TestNamingProvidersSerializePageImages(t *testing.T) {
+	encodedImage := base64.StdEncoding.EncodeToString([]byte("page-image"))
+	for _, tc := range []struct {
+		name, model, marker, reply string
+	}{
+		{"openai", "gpt-4o", `"type":"input_image"`, `{"id":"resp-1","model":"gpt-4o","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"Summons"}]}],"usage":{"input_tokens":10,"output_tokens":5}}`},
+		{"anthropic", "claude-test", `"type":"image"`, `{"id":"msg_1","model":"claude-test","type":"message","content":[{"type":"text","text":"Summons"}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}}`},
+		{"google", "gemini-test", `"inlineData"`, `{"candidates":[{"content":{"parts":[{"text":"Summons"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}`},
+		{"xai", "grok-test", `"image_url"`, `{"id":"chatcmpl-123","model":"grok-test","choices":[{"message":{"role":"assistant","content":"Summons"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			transport := namingRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+				payload, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Contains(payload, []byte(tc.marker)) || !bytes.Contains(payload, []byte(encodedImage)) ||
+					!bytes.Contains(payload, []byte("opening page images")) || bytes.Contains(payload, []byte(`"file"`)) {
+					t.Fatalf("provider image request has wrong shape: %s", payload)
+				}
+				return namingReply(http.StatusOK, tc.reply), nil
+			})
+			client, err := newProviderClient(NamingRequest{Provider: tc.name, Model: tc.model, APIKey: "test-secret"}, transport)
+			if err != nil {
+				t.Fatal(err)
+			}
+			label, usage, err := client.Generate(t.Context(), "instruction", namingInput{
+				Images: []NamingImage{{MediaType: "image/png", Data: []byte("page-image")}},
+			})
+			if err != nil || label != "Summons" || usage.RequestBytes == 0 {
+				t.Fatalf("label=%q usage=%+v error=%v", label, usage, err)
 			}
 		})
 	}
@@ -158,7 +195,7 @@ func TestNamingProviderControlledErrorsAndNoHiddenRetries(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, usage, err := client.Generate(t.Context(), "instruction", "motion to dismiss")
+				_, usage, err := client.Generate(t.Context(), "instruction", namingInput{Text: "motion to dismiss"})
 				reason, permanent := namingFailure(err)
 				if calls != 1 || reason != status.reason || permanent != status.permanent || usage.Reported || usage.RequestBytes == 0 {
 					t.Fatalf("status=%d calls=%d reason=%q permanent=%t usage=%+v err=%v", status.code, calls, reason, permanent, usage, err)
@@ -187,7 +224,7 @@ func TestNamingProviderRefusalsDoNotBecomeLabels(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			label, usage, err := client.Generate(t.Context(), "instruction", "motion to dismiss")
+			label, usage, err := client.Generate(t.Context(), "instruction", namingInput{Text: "motion to dismiss"})
 			if reason, permanent := namingFailure(err); reason != "provider_refusal" || !permanent || label != "" || calls != 1 || !usage.Reported {
 				t.Fatalf("refusal: label=%q reason=%s permanent=%t calls=%d usage=%+v", label, reason, permanent, calls, usage)
 			}
@@ -205,13 +242,17 @@ func TestNamingProviderBoundsAndDestination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, usage, err := client.Generate(t.Context(), "instruction", "motion to dismiss")
+	_, usage, err := client.Generate(t.Context(), "instruction", namingInput{Text: "motion to dismiss"})
 	if reason, _ := namingFailure(err); reason != "provider_error" || usage.RequestBytes == 0 || calls.Load() != 1 {
 		t.Fatalf("oversized reply: reason=%s usage=%+v calls=%d", reason, usage, calls.Load())
 	}
-	_, usage, err = client.Generate(t.Context(), "instruction", strings.Repeat("x", maxProviderExcerptChars+1))
+	_, usage, err = client.Generate(t.Context(), "instruction", namingInput{Text: strings.Repeat("x", maxProviderExcerptChars+1)})
 	if reason, _ := namingFailure(err); reason != "payload_limit" || usage.RequestBytes != 0 || calls.Load() != 1 {
 		t.Fatalf("oversized excerpt: reason=%s usage=%+v calls=%d", reason, usage, calls.Load())
+	}
+	_, usage, err = client.Generate(t.Context(), "instruction", namingInput{Images: make([]NamingImage, maxNamingImages+1)})
+	if reason, _ := namingFailure(err); reason != "payload_limit" || usage.RequestBytes != 0 || calls.Load() != 1 {
+		t.Fatalf("too many images: reason=%s usage=%+v calls=%d", reason, usage, calls.Load())
 	}
 	for _, destination := range []string{"https://unexpected.invalid/v1/responses", "http://api.openai.com/v1/responses", "https://api.openai.com/v1/files"} {
 		r, err := http.NewRequest(http.MethodPost, destination, strings.NewReader(`{}`))
@@ -250,7 +291,7 @@ func TestNamingProviderDoesNotFollowRedirect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = client.Generate(t.Context(), "instruction", "motion to dismiss")
+	_, _, err = client.Generate(t.Context(), "instruction", namingInput{Text: "motion to dismiss"})
 	if reason, _ := namingFailure(err); reason != "provider_error" || calls != 1 {
 		t.Fatalf("redirect: reason=%s calls=%d", reason, calls)
 	}
@@ -298,7 +339,7 @@ func TestNamingProviderUnknownUsageAfterTransportFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, usage, err := client.Generate(t.Context(), "instruction", "motion to dismiss")
+	_, usage, err := client.Generate(t.Context(), "instruction", namingInput{Text: "motion to dismiss"})
 	if reason, _ := namingFailure(err); reason != "provider_error" || calls != 1 || usage.RequestBytes == 0 || usage.Reported {
 		t.Fatalf("transport failure: reason=%s calls=%d usage=%+v", reason, calls, usage)
 	}
@@ -317,7 +358,7 @@ func TestNamingProviderCancellation(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	time.AfterFunc(10*time.Millisecond, cancel)
-	_, usage, err := client.Generate(ctx, "instruction", "motion to dismiss")
+	_, usage, err := client.Generate(ctx, "instruction", namingInput{Text: "motion to dismiss"})
 	if !errors.Is(err, context.Canceled) || calls.Load() != 1 || usage.RequestBytes == 0 || usage.Reported {
 		t.Fatalf("cancel: err=%v calls=%d usage=%+v", err, calls.Load(), usage)
 	}

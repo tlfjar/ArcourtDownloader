@@ -71,9 +71,10 @@ Coverage includes:
   verified repeat skips, injected I/O failure, and interrupted processes.
 - CLI argument bounds, text/JSON output and exit codes; desktop selection,
   generations, cancellation, progress, settings, and frontend state transitions.
-- Opening-page PDF extraction limits and scan fallback; four native provider
-  request/response shapes; context/call bounds; naming receipt/recovery/reruns,
-  secure credential settings, and filename fallback without PDF loss.
+- Opening-page PDF text and scan-image extraction limits; four native provider
+  text/image request and response shapes; context/call bounds; naming
+  receipt/recovery/reruns, secure credential settings, and filename fallback
+  without PDF loss.
 
 Windows-only tests cover junctions and open-handle rename failure. Symbolic-link
 tests may skip when the account cannot create links; inspect and record skips.
