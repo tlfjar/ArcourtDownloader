@@ -112,7 +112,7 @@ func ExtractNamingEvidence(ctx context.Context, file io.ReaderAt, size int64) (o
 	substantive := flattenNamingLines(pages, true)
 	useful := strings.Join(substantive, " ")
 	if len(substantive) == 0 || (utf8.RuneCountInString(useful) < 8 && !namingTypeWord.MatchString(useful)) ||
-		(imageCount > 0 && utf8.RuneCountInString(useful) < 40) {
+		(imageCount > 0 && (utf8.RuneCountInString(useful) < 40 || !namingTypeWord.MatchString(useful))) {
 		out.Reason = "unreadable"
 		if imageCount > 0 {
 			out.Reason = "image_only"

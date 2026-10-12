@@ -272,6 +272,9 @@ func TestNamingRejectsUnsafeAndUnsupportedLabels(t *testing.T) {
 	if label, reason := normalizeNamingLabel("Defendant Second Amended Motion to Compel", evidence); label == "" || reason != "" {
 		t.Fatalf("grounded label rejected: %q, %q", label, reason)
 	}
+	if label, reason := normalizeNamingLabel("Summons - Filer Prepared", "Type: SUMMONS - FILER PREPARED\nSo Ordered"); label == "" || reason != "" {
+		t.Fatalf("label without administrative heading prefix rejected: %q, %q", label, reason)
+	}
 }
 
 func TestNamingPreservesClearHeadingDistinctions(t *testing.T) {

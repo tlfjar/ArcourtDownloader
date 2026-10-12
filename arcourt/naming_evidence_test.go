@@ -184,6 +184,23 @@ func TestNamingEvidenceClassifiesImageOnlyAndUnreadable(t *testing.T) {
 	if e := evidenceFromBytes(stampedImage); e.Reason != "image_only" || e.Small != "" {
 		t.Fatalf("stamped image-only fixture: %+v", e)
 	}
+	longStampedImage := pdftest.Build(1,
+		pdftest.Catalog(2),
+		pdftest.Pages(3),
+		pdftest.Page(2, 4, "<< /XObject << /Im1 6 0 R >> /Font << /F1 5 0 R >> >>"),
+		pdftest.Stream("", namingPageContent([]string{
+			"Craighead County Circuit Court in Jonesboro",
+			"David Vaughn, Craighead Circuit Clerk",
+			"2025-Feb-24 14:21:48",
+			"16JDR-25-145",
+			"C02D10 : 3 Pages",
+		})+" /Im1 Do"),
+		pdftest.Helvetica(),
+		pdftest.Stream("/Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", "x"),
+	)
+	if e := evidenceFromBytes(longStampedImage); e.Reason != "image_only" || e.Small != "" {
+		t.Fatalf("long clerk stamp disguised an image-only fixture: %+v", e)
+	}
 	blank := syntheticNamingPDF([]string{})
 	if e := evidenceFromBytes(blank); e.Reason != "unreadable" {
 		t.Fatalf("blank fixture: %+v", e)

@@ -174,6 +174,9 @@ func preservesNamingHeading(label, excerpt string) bool {
 	if heading == "" {
 		return true
 	}
+	if strings.HasPrefix(strings.ToLower(heading), "type:") {
+		heading = strings.TrimSpace(heading[len("type:"):])
+	}
 	typeWord := strings.ToLower(namingLabelType.FindString(heading))
 	if typeWord == "" {
 		return true // No clear supported title type to assert.
