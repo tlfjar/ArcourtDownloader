@@ -3,6 +3,7 @@ package arcourt
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -23,12 +24,13 @@ import (
 )
 
 // The transport checks the SDK's serialized request, including any content the
-// SDK adds to the system instruction and excerpt. The PDF never leaves as a file.
+// SDK adds to the system instruction, excerpt, and images. The PDF never leaves
+// as a file.
 const (
 	maxProviderPromptBytes  = 2048
 	maxProviderExcerptChars = 4096
 	maxProviderExcerptBytes = 8192
-	maxProviderRequestBytes = 16 << 10
+	maxProviderRequestBytes = 6 << 20
 	maxProviderReplyBytes   = 64 << 10
 	providerOutputTokens    = 96
 )
@@ -66,15 +68,22 @@ func directNamingTransport() *http.Transport {
 	}
 }
 
-func (c *providerClient) Generate(ctx context.Context, prompt, excerpt string) (string, NamingUsage, error) {
+func (c *providerClient) Generate(ctx context.Context, prompt string, input namingInput) (string, NamingUsage, error) {
 	var usage NamingUsage
 	if err := ctx.Err(); err != nil {
 		return "", usage, err
 	}
-	if prompt == "" || excerpt == "" || !utf8.ValidString(prompt) || !utf8.ValidString(excerpt) ||
-		len(prompt) > maxProviderPromptBytes || len(excerpt) > maxProviderExcerptBytes ||
-		utf8.RuneCountInString(excerpt) > maxProviderExcerptChars {
+	if prompt == "" || !utf8.ValidString(prompt) || len(prompt) > maxProviderPromptBytes ||
+		(input.Text == "" && len(input.Images) == 0) || !utf8.ValidString(input.Text) ||
+		len(input.Text) > maxProviderExcerptBytes || utf8.RuneCountInString(input.Text) > maxProviderExcerptChars ||
+		len(input.Images) > maxNamingImages {
 		return "", usage, &namingError{reason: "payload_limit"}
+	}
+	for _, image := range input.Images {
+		if len(image.Data) == 0 || len(image.Data) > maxNamingImageEncodedBytes ||
+			image.MediaType != "image/png" && image.MediaType != "image/jpeg" {
+			return "", usage, &namingError{reason: "payload_limit"}
+		}
 	}
 
 	var requestBytes atomic.Int64
@@ -89,11 +98,27 @@ func (c *providerClient) Generate(ctx context.Context, prompt, excerpt string) (
 	model := c.model(httpClient)
 	options := []goai.Option{
 		goai.WithSystem(prompt),
-		goai.WithPrompt(excerpt),
 		goai.WithMaxOutputTokens(providerOutputTokens),
 		goai.WithMaxRetries(0),
 		goai.WithMaxSteps(1),
 		goai.WithPromptCaching(false),
+	}
+	if len(input.Images) == 0 {
+		options = append(options, goai.WithPrompt(input.Text))
+	} else {
+		parts := []provider.Part{{Type: provider.PartText, Text: input.Text}}
+		if input.Text == "" {
+			parts[0].Text = "Name the court PDF shown in these opening page images."
+		}
+		for _, image := range input.Images {
+			parts = append(parts, provider.Part{
+				Type:      provider.PartImage,
+				URL:       "data:" + image.MediaType + ";base64," + base64.StdEncoding.EncodeToString(image.Data),
+				MediaType: image.MediaType,
+				Detail:    "high",
+			})
+		}
+		options = append(options, goai.WithMessages(provider.Message{Role: provider.RoleUser, Content: parts}))
 	}
 	// Luna defaults to medium reasoning. This short classification task has a
 	// 96-token total output budget, so request direct output for these models.

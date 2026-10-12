@@ -22,10 +22,10 @@ export function totals(c) {
 export function doneCount(c) { return c.Succeeded + c.Skipped + c.Failed + c.Unavailable + c.Canceled; }
 
 const namingFallbackReasons = {
-  image_only: 'scanned or image-only PDF',
+  image_only: 'scanned page image unavailable',
   too_large: 'PDF too large for naming',
   encrypted: 'encrypted PDF',
-  unreadable: 'no usable text',
+  unreadable: 'no usable text or page image',
   insufficient_context: 'title unclear',
   unsafe_result: 'model label could not be used',
   unsupported_result: 'model label did not match the title',
@@ -51,15 +51,15 @@ export function namingDetail(n) {
   return 'Standard filename';
 }
 
-// Only provider/model combinations with a completed held-out naming-quality
-// evaluation are presented as measured. Everything else is labeled
-// experimental so an operator is not led to assume untested naming is proven.
+// The held-out evaluation predates scanned-page image input. Everything else is
+// labeled experimental so an operator is not led to assume untested naming is
+// proven.
 export const namingEvaluatedModels = { openai: ['gpt-6-luna'] };
 
 export function namingQualityNote(provider, model) {
   const evaluated = namingEvaluatedModels[provider] || [];
   if (evaluated.includes(String(model ?? '').trim())) {
-    return `Naming quality for ${String(model).trim()} was measured against held-out synthetic filings and met this project's targets. Real court documents were not tested.`;
+    return `Text-excerpt naming quality for ${String(model).trim()} was measured against held-out synthetic filings and met this project's targets. Scanned-page image naming and real court documents were not evaluated.`;
   }
   return evaluated.length
     ? `Experimental: naming quality for this model is unmeasured. Only ${evaluated.join(', ')} has been evaluated on this provider. An unusable label keeps the standard filename.`

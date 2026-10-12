@@ -27,6 +27,25 @@ func syntheticNamingPDF(pages ...[]string) []byte {
 	return pdftest.Build(1, objects...)
 }
 
+func syntheticScannedNamingPDF(pageCount int) []byte {
+	const width, height = 300, 400
+	objects := []string{pdftest.Catalog(2), ""}
+	ids := make([]int, 0, pageCount)
+	for range pageCount {
+		pageID := len(objects) + 1
+		contentID := pageID + 1
+		imageID := pageID + 2
+		ids = append(ids, pageID)
+		objects = append(objects,
+			pdftest.Page(2, contentID, fmt.Sprintf("<< /XObject << /Im1 %d 0 R >> >>", imageID)),
+			pdftest.Stream("", "q 612 0 0 792 0 0 cm /Im1 Do Q"),
+			pdftest.Stream(fmt.Sprintf("/Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceGray /BitsPerComponent 8", width, height), strings.Repeat("\xff", width*height)),
+		)
+	}
+	objects[1] = pdftest.Pages(ids...)
+	return pdftest.Build(1, objects...)
+}
+
 func namingPageContent(lines []string) string {
 	var b strings.Builder
 	b.WriteString("BT /F1 12 Tf 72 700 Td ")
@@ -184,12 +203,41 @@ func TestNamingEvidenceClassifiesImageOnlyAndUnreadable(t *testing.T) {
 	if e := evidenceFromBytes(stampedImage); e.Reason != "image_only" || e.Small != "" {
 		t.Fatalf("stamped image-only fixture: %+v", e)
 	}
+	longStampedImage := pdftest.Build(1,
+		pdftest.Catalog(2),
+		pdftest.Pages(3),
+		pdftest.Page(2, 4, "<< /XObject << /Im1 6 0 R >> /Font << /F1 5 0 R >> >>"),
+		pdftest.Stream("", namingPageContent([]string{
+			"Craighead County Circuit Court in Jonesboro",
+			"David Vaughn, Craighead Circuit Clerk",
+			"2025-Feb-24 14:21:48",
+			"16JDR-25-145",
+			"C02D10 : 3 Pages",
+		})+" /Im1 Do"),
+		pdftest.Helvetica(),
+		pdftest.Stream("/Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", "x"),
+	)
+	if e := evidenceFromBytes(longStampedImage); e.Reason != "image_only" || e.Small != "" {
+		t.Fatalf("long clerk stamp disguised an image-only fixture: %+v", e)
+	}
 	blank := syntheticNamingPDF([]string{})
 	if e := evidenceFromBytes(blank); e.Reason != "unreadable" {
 		t.Fatalf("blank fixture: %+v", e)
 	}
 	if e := evidenceFromBytes([]byte("%PDF-1.4\ninvalid\n%%EOF")); e.Reason != "unreadable" {
 		t.Fatalf("malformed fixture: %+v", e)
+	}
+}
+
+func TestNamingEvidenceEncodesFirstTwoScannedPages(t *testing.T) {
+	e := evidenceFromBytes(syntheticScannedNamingPDF(3))
+	if e.Reason != "" || e.Pages != 2 || e.Small != "" || e.Medium != "" || len(e.Images) != 2 {
+		t.Fatalf("scanned opening pages not prepared for naming: %+v", e)
+	}
+	for i, image := range e.Images {
+		if image.MediaType != "image/png" || len(image.Data) == 0 || len(image.Data) > maxNamingImageEncodedBytes {
+			t.Errorf("image %d is not a bounded PNG: type=%q bytes=%d", i, image.MediaType, len(image.Data))
+		}
 	}
 }
 

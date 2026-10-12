@@ -5,26 +5,28 @@ AI naming is off by default. It runs only for a newly downloaded, selected PDF a
 ## Desktop workflow
 
 1. In **Settings & diagnostics → Optional AI document names**, enable naming, choose OpenAI, xAI, Anthropic, or Google, and enter a model ID available to your provider account. The application validates configuration locally; saving settings does not make a paid request.
-2. Review the direct recipient shown for the selected provider, the bounded-text disclosure, possible sensitive content, possible API charges, and the fallback behavior. Check the recipient consent box and save settings. Changing provider clears the box and requires consent for the new recipient.
-3. Save or replace that provider's API key in the separate credential form. The form displays configured, missing, or unavailable status and can remove the key. The entered value is cleared from the UI after submission. Windows Credential Manager stores the key for the current Windows user; `settings.json` stores only the enable flag, provider, model ID, and approved recipient. Snapshots and download manifests never contain the key.
+2. Review the direct recipient shown for the selected provider, the bounded opening-page text/image disclosure, possible sensitive content, possible API charges, and the fallback behavior. Check the recipient consent box and save settings. Changing the provider or disclosure version clears the box and requires fresh consent.
+3. Save or replace that provider's API key in the separate credential form. The form displays configured, missing, or unavailable status and can remove the key. The entered value is cleared from the UI after submission. Windows Credential Manager stores the key for the current Windows user; `settings.json` stores only the enable flag, provider, model ID, and approved recipient/disclosure version. Snapshots and download manifests never contain the key.
 4. Preview the case, verify its header, select documents, and download as usual. The per-document result shows **AI label** when a label was accepted or **Standard filename** with a controlled fallback reason. A naming fallback does not change a successfully saved PDF into a failed download. Missing consent, missing keys, or unavailable secure storage leave ordinary downloading usable.
 
 The selected non-secret settings and credential are captured when the download job starts. Settings and credential changes are disabled while a job is busy. Requests go directly to the selected provider's documented HTTPS route:
 
 | Provider | Recipient | Connector status | Live naming quality |
 | --- | --- | --- | --- |
-| [OpenAI](https://developers.openai.com/api/reference/resources/responses/methods/create) | `https://api.openai.com/v1/responses` | Implemented; injected connector/request tests pass | **Evaluated.** `gpt-6-luna` met every declared gate on the held-out `synthetic-court-v6` corpus under `title-excerpt-v3`. No claim for other model IDs or real court documents. |
-| [xAI](https://docs.x.ai/developers/rest-api-reference/inference/chat-completions) | `https://api.x.ai/v1/chat/completions` | Implemented; injected connector/request tests pass | **Experimental: unmeasured.** No xAI API key was available, so no live quality run exists. |
-| [Anthropic](https://platform.claude.com/docs/en/api/messages/create) | `https://api.anthropic.com/v1/messages` | Implemented; injected connector/request tests pass | **Experimental: unmeasured.** No Anthropic API key was available, so no live quality run exists. |
-| [Google](https://ai.google.dev/api/generate-content) | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | Implemented; injected connector/request tests pass | **Experimental: unmeasured.** No Google API key was available, so no live quality run exists. |
+| [OpenAI](https://developers.openai.com/api/reference/resources/responses/methods/create) | `https://api.openai.com/v1/responses` | Implemented; injected text/image connector tests pass | **Text path evaluated.** `gpt-6-luna` met every declared gate on the held-out `synthetic-court-v6` corpus under `title-excerpt-v3`. The later opening-page image path has only a limited compatibility smoke test, not a quality evaluation. |
+| [xAI](https://docs.x.ai/developers/rest-api-reference/inference/chat-completions) | `https://api.x.ai/v1/chat/completions` | Implemented; injected text/image connector tests pass | **Experimental: unmeasured.** No xAI API key was available, so no live quality run exists. |
+| [Anthropic](https://platform.claude.com/docs/en/api/messages/create) | `https://api.anthropic.com/v1/messages` | Implemented; injected text/image connector tests pass | **Experimental: unmeasured.** No Anthropic API key was available, so no live quality run exists. |
+| [Google](https://ai.google.dev/api/generate-content) | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | Implemented; injected text/image connector tests pass | **Experimental: unmeasured.** No Google API key was available, so no live quality run exists. |
 
 A connector being implemented and transport-tested says only that requests are
 built, sent, and parsed correctly against that provider's documented route. It
 does not say the chosen model produces good filenames. Every provider passes
-through the same local extraction limits, the same `title-excerpt-v3` label
-validator, the same filename sanitization, and the same deterministic fallback,
-so an unmeasured provider cannot bypass those protections; the realistic risk of
-selecting one is a lower rate of useful labels, not an unsafe filename. There is
+through the same local extraction limits, short-label/type validator, filename
+sanitization, and deterministic fallback. Text labels additionally retain the
+`title-excerpt-v3` grounding and heading-preservation checks. Image labels cannot
+be independently grounded without OCR, so their content accuracy remains
+model-dependent. The format checks still prevent an unsafe filename, but an
+unmeasured provider or model may produce a plausible incorrect label. There is
 no automatic cross-provider fallback: a failure with the selected provider keeps
 the deterministic name rather than sending the excerpt somewhere else. Model
 choice matters as much as provider choice, and an unevaluated model ID on an
@@ -34,23 +36,23 @@ The connector selection is detailed in [the connector evaluation](ai-connector-e
 
 ## Data flow and limits
 
-The completed staged PDF stays local. A portable Go parser reads only the first two pages' text; it may inspect PDF structure to locate those pages, but does not extract later page content. Local selection favors a line containing a document-type word near the top of an opening page, preserves nearby wrapped heading and explanatory lines, removes common caption and contact boilerplate, and deduplicates repeated lines. This is a heuristic, so ambiguous or unusable evidence falls back.
+The completed staged PDF stays local. A portable Go parser inspects only the first two pages; it may inspect PDF structure to locate those pages, but does not extract later page content. When usable text exists, local selection favors a line containing a document-type word near the top of an opening page, preserves nearby wrapped heading and explanatory lines, removes common caption and contact boilerplate, and deduplicates repeated lines. When a scanned page lacks usable title text, the largest embedded page image is decoded locally, resized with aspect ratio preserved, and encoded as PNG or JPEG. ArcourtDownloader does not perform OCR.
 
 | Boundary | Current maximum or behavior |
 | --- | --- |
 | PDF eligible for optional parsing | 16 MiB; larger validated downloads keep an ordinary name. |
-| Pages and parser work | First two pages; a 5-second extraction context and at most 64 MiB cumulative local file reads. The parser caps page-tree traversal at 50,000 nodes and depth 64. Per page: 16,000 glyphs, 100,000 operators, 1 MiB stream, form depth 8, up to 64 images, 1 MiB image bytes, 1 million image pixels. |
-| Local evidence | Targeted small excerpt: 512 characters / 2 KiB; targeted medium excerpt: 1,024 characters / 4 KiB; opening-page benchmark baseline: 4,096 characters / 8 KiB. |
-| Production transmission | Small targeted excerpt first. Medium targeted excerpt is sent only after an explicit `ABSTAIN` and only if it contains more evidence. Baseline is not sent by the normal download path. |
-| Final provider boundary | System instruction at most 2,048 bytes; excerpt at most 4,096 characters and 8 KiB; entire SDK-serialized JSON request at most 16 KiB; response body at most 64 KiB. These are byte/character ceilings, not exact provider-token guarantees. |
-| Calls and time | At most two transmissions per document, including expansion; SDK retries and tool steps are disabled. A twelve-second context deadline covers extraction and naming; each HTTP call has a ten-second timeout within that deadline. Requested output limit: 96 tokens. |
-| Accepted filename label | Short ASCII label, at most 64 bytes. Version `title-excerpt-v3` requires the result to retain the selected heading's material ASCII words, in the order the heading states them, including its document type, subject, ruling, status, amendment, and exhibit identifier. Non-material articles and connective words, plus a non-filing party role, may be omitted. `ABSTAIN`, unsafe, unsupported, paraphrased, reordered, truncated, or overlong results fall back; material words are not silently dropped, and the title is not silently rearranged into a different description. This validation is conservative and may reject a reasonable synonym, but does not establish that every accepted label is correct. |
+| Pages and parser work | First two pages; a 5-second extraction context and at most 64 MiB cumulative local file reads. The parser caps page-tree traversal at 50,000 nodes and depth 64. Per page: 16,000 glyphs, 100,000 operators, 4 MiB stream, form depth 8, up to 64 images, 6 MiB image bytes, and 12 million image pixels. |
+| Local evidence | Text: targeted small excerpt of 512 characters / 2 KiB, targeted medium excerpt of 1,024 characters / 4 KiB, and a 4,096-character / 8 KiB benchmark baseline. Scans: at most one embedded image per opening page, at most two images total, resized to at most 2,048 pixels on the longest side and encoded to at most 2 MiB each. |
+| Production transmission | Usable text sends the small targeted excerpt first; medium text is sent only after `ABSTAIN` and only when it adds evidence. A scan sends up to two opening-page images in one request. Text and image routes are alternatives. The benchmark baseline and complete PDF are never sent by production naming. |
+| Final provider boundary | System instruction at most 2,048 bytes; excerpt at most 4,096 characters and 8 KiB; at most two PNG/JPEG images of 2 MiB each; complete SDK-serialized JSON request at most 6 MiB; response body at most 64 KiB. These are byte/character ceilings, not exact provider-token guarantees. |
+| Calls and time | At most two text transmissions per document, including expansion, or one image transmission; SDK retries and tool steps are disabled. A twelve-second context deadline covers extraction and naming; each HTTP call has a ten-second timeout within that deadline. Requested output limit: 96 tokens. |
+| Accepted filename label | Short ASCII label containing a supported court-document type, at most 64 bytes. Text results must also retain the selected heading's material ASCII words in order under the `title-excerpt-v3` checks. Image results cannot be locally grounded without OCR and therefore rely on the model for content accuracy, but still pass format/type checks and the normal filename sanitizer. `ABSTAIN`, unsafe, unsupported, or overlong results fall back. |
 
-The provider receives a short system instruction and one document excerpt as text. The instruction asks for material heading words to be preserved rather than paraphrased. It does not receive the PDF, image, source or signed URL, case history, other documents, court cookies, or a conversation. The AI request uses a separate HTTP client with fixed HTTPS destination and no environment proxy or redirect forwarding. No file upload, remote URL-fetch tool, web tool, automatic provider change, or image mode is configured. API keys are sent as provider-specific request headers.
+The provider receives a short system instruction and either one bounded text excerpt or up to two inline images from the opening pages. The instruction asks for material heading words to be preserved rather than paraphrased. It does not receive the complete PDF, source or signed URL, case history, later pages, other documents, court cookies, or a conversation. The AI request uses a separate HTTP client with fixed HTTPS destination and no environment proxy or redirect forwarding. No file upload, remote URL-fetch tool, web tool, or automatic provider change is configured. API keys are sent as provider-specific request headers.
 
 Cancellation is checked on parser file reads and provider requests. Portable Go cannot forcibly interrupt a parser's in-memory structural step or a blocked kernel file read, so the context deadline is not a hard operating-system time limit. The file-size, cumulative-read, parser-work, and page-tree ceilings limit the work that can continue before fallback.
 
-Scanned or image-only pages without usable text use the `image_only` ordinary-name fallback. The application does not perform OCR or send page images. Encrypted, malformed, oversized, or otherwise unreadable PDFs also fall back locally. A fallback here is a saved PDF with a standard filename, not a successful content-based name.
+Scanned pages without usable title text use bounded embedded page images when they can be decoded safely. A scan whose images are absent, too small, unsupported, over budget, or otherwise unusable keeps the `image_only` ordinary-name fallback. Encrypted, malformed, oversized, or otherwise unreadable PDFs also fall back locally. A fallback here is a saved PDF with a standard filename, not a successful content-based name.
 
 `RequestBytes` records the complete serialized outbound JSON body for an attempted request, including SDK-added JSON. `InputTokenEstimate` uses one token per request-body byte as a conservative local estimate; it is not a tokenizer result or provider charge. Provider-reported input, output, cached, and reasoning token counts are kept separately. Usage missing from a failed or incomplete request is **unknown**, not zero. A transport error or cancellation can happen after a request is sent, so recorded bytes do not establish whether the provider completed or billed it. The app does not automatically replay such uncertain calls.
 
@@ -58,7 +60,7 @@ Scanned or image-only pages without usable text use the `image_only` ordinary-na
 
 | Result | Meaning |
 | --- | --- |
-| **AI label** | The bounded response passed local format and evidence checks, and its label was used in the saved filename. |
+| **AI label** | The bounded response passed the applicable local safety checks, and its label was used in the saved filename. Text labels also passed local evidence-grounding checks; image labels cannot be independently grounded without OCR. |
 | **Standard filename** | The PDF was saved with its ordinary deterministic name. The displayed reason may identify unusable local text (`image_only`, `encrypted`, `too_large`, `unreadable`), insufficient or rejected model output (`insufficient_context`, `unsafe_result`, `unsupported_result`, `length_exhaustion`), a provider/configuration problem (`configuration`, `provider_auth`, `provider_model`, `rate_limited`, `provider_refusal`, `provider_error`, `payload_limit`), or cancellation/timeout. |
 
 The download's own saved, skipped, failed, unavailable, or canceled status remains separate from the naming result. When naming was disabled or omitted before the download, no AI naming result is recorded.
@@ -190,7 +192,7 @@ To reproduce the `gpt-6-luna` live evaluation with a masked key prompt and finit
 ./scripts/benchmark-naming.ps1 -Corpus v4 -Live -Provider openai -Model gpt-6-luna -MaxCalls 241 -MaxRequestBytes 1048576 -AcknowledgeCharges -ReportPath build/naming-benchmark-openai-luna6-v4-live.json
 ```
 
-The 241-call cap permits at most two calls for each of the 40 text cases in all three strategies plus a final no-call scan check; the per-request 16 KiB and per-generation 96-token limits still apply. All three strategies must each contain 48 cases, with no budget exhaustion, before the quality statuses or selected strategy are meaningful. Use the saved source revision and scoring version to distinguish this evaluation from v3.
+The 241-call cap permits at most two calls for each of the 40 text cases in all three strategies plus a final no-call scan check; this historical run used the then-current 16 KiB per-request cap and the still-current 96-token generation limit. All three strategies must each contain 48 cases, with no budget exhaustion, before the quality statuses or selected strategy are meaningful. Use the saved source revision and scoring version to distinguish this evaluation from v3.
 
 ### Later corpora and reproduction
 

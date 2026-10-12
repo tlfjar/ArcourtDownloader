@@ -82,7 +82,8 @@ End users need neither Go nor Node.
    the manifest, verified repeat skips, destination restrictions, and recovery.
 
 Optional naming is configured in the same Settings panel. Select a provider and
-model, review and consent to its direct recipient and bounded text disclosure,
+model, review and consent to its direct recipient and bounded opening-page
+content disclosure,
 then save or replace that provider's API key through the separate credential
 action. The form reports only configured/missing/unavailable key status. The
 setting is off by default, and a missing key or consent keeps the normal filename
@@ -93,8 +94,9 @@ Defaults: sequential downloads, at most 200 discovered documents, the core's
 PDF/HTTP/retry limits, 90-second page timeout, and a 30-minute operation deadline.
 The CLI offers advanced overrides. There are no accounts, telemetry, application
 cloud backend, OCR, or automatic application updates. Optional AI naming sends
-bounded text directly to the selected provider after downloaded PDF bytes pass
-the independent local validation step.
+bounded text or page images from at most the first two pages directly to the
+selected provider after downloaded PDF bytes pass the independent local
+validation step.
 
 ## State, settings, and shutdown
 

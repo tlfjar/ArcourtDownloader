@@ -17,10 +17,12 @@ type Preferences struct {
 	NamingEnabled   bool   `json:"namingEnabled"`
 	NamingProvider  string `json:"namingProvider"`
 	NamingModel     string `json:"namingModel"`
-	// NamingConsentRecipient is the exact direct endpoint approved in Settings.
-	// Changing a provider endpoint requires fresh consent.
+	// NamingConsentRecipient records the disclosure version and exact direct
+	// endpoint approved in Settings. Either change requires fresh consent.
 	NamingConsentRecipient string `json:"namingConsentRecipient"`
 }
+
+const namingConsentScope = "opening-pages-v1"
 
 var namingRecipients = map[string]string{
 	"openai":    "https://api.openai.com/v1/responses",
@@ -34,6 +36,13 @@ var namingRecipients = map[string]string{
 var namingModelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 
 func namingRecipient(provider string) string { return namingRecipients[provider] }
+
+func namingConsentValue(provider string) string {
+	if recipient := namingRecipient(provider); recipient != "" {
+		return namingConsentScope + " " + recipient
+	}
+	return ""
+}
 
 type PreferenceStore struct{ Path string }
 
@@ -97,7 +106,7 @@ func validatePreferences(p Preferences) error {
 	if p.NamingEnabled && (p.NamingProvider == "" || strings.TrimSpace(p.NamingModel) == "") {
 		return errors.New("Choose a provider and model before enabling AI naming.")
 	}
-	if p.NamingConsentRecipient != "" && p.NamingConsentRecipient != namingRecipient(p.NamingProvider) {
+	if p.NamingConsentRecipient != "" && p.NamingConsentRecipient != namingConsentValue(p.NamingProvider) {
 		return errors.New("Review and consent to the selected AI recipient again.")
 	}
 	if p.CaseURLTemplate != "" {

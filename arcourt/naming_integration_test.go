@@ -14,26 +14,26 @@ import (
 )
 
 type fakeNamingClient struct {
-	calls []string
+	calls []namingInput
 	fn    func(context.Context, string) (string, error)
 }
 
 type invalidUsageNamingClient struct{}
 
-func (invalidUsageNamingClient) Generate(context.Context, string, string) (string, NamingUsage, error) {
+func (invalidUsageNamingClient) Generate(context.Context, string, namingInput) (string, NamingUsage, error) {
 	return "Motion to Dismiss", NamingUsage{RequestBytes: 400, InputTokens: -1, Reported: true}, nil
 }
 
-func (f *fakeNamingClient) Generate(ctx context.Context, prompt, excerpt string) (string, NamingUsage, error) {
-	f.calls = append(f.calls, excerpt)
+func (f *fakeNamingClient) Generate(ctx context.Context, prompt string, input namingInput) (string, NamingUsage, error) {
+	f.calls = append(f.calls, input)
 	if !strings.Contains(prompt, "ABSTAIN") {
 		return "", NamingUsage{}, errors.New("missing naming contract")
 	}
 	if f.fn == nil {
-		return "Defendant Motion to Compel", NamingUsage{InputTokens: 20, OutputTokens: 6, Reported: true, RequestBytes: len(prompt) + len(excerpt)}, nil
+		return "Defendant Motion to Compel", NamingUsage{InputTokens: 20, OutputTokens: 6, Reported: true, RequestBytes: len(prompt) + len(input.Text)}, nil
 	}
-	raw, err := f.fn(ctx, excerpt)
-	return raw, NamingUsage{RequestBytes: len(prompt) + len(excerpt)}, err
+	raw, err := f.fn(ctx, input.Text)
+	return raw, NamingUsage{RequestBytes: len(prompt) + len(input.Text)}, err
 }
 
 func namingDownloadFixture(t *testing.T, count int, pdf []byte) (*DownloadService, *localFakeFetcher, DownloadRequest) {
@@ -80,7 +80,7 @@ func TestNamingUsesVerifiedPDFBeforeNoOverwritePublication(t *testing.T) {
 	if readErr != nil || !bytes.Equal(saved, pdf) {
 		t.Fatalf("PDF bytes changed: %v", readErr)
 	}
-	if len(client.calls) != 1 || strings.Contains(client.calls[0], "DO-NOT-SEND") || strings.Contains(client.calls[0], "UNSELECTED THIRD PAGE") || strings.Contains(client.calls[0], "https://") || strings.Contains(client.calls[0], "TEST-SECRET") {
+	if len(client.calls) != 1 || strings.Contains(client.calls[0].Text, "DO-NOT-SEND") || strings.Contains(client.calls[0].Text, "UNSELECTED THIRD PAGE") || strings.Contains(client.calls[0].Text, "https://") || strings.Contains(client.calls[0].Text, "TEST-SECRET") {
 		t.Fatalf("unexpected provider context: %q", client.calls)
 	}
 	m := readDownloadManifest(t, r)
@@ -204,6 +204,23 @@ func TestNamingImageOnlyFallbackNeverCallsProvider(t *testing.T) {
 	}
 }
 
+func TestNamingSendsFirstTwoScannedPages(t *testing.T) {
+	pdf := syntheticScannedNamingPDF(3)
+	s, _, req := namingDownloadFixture(t, 1, pdf)
+	req.Naming = &NamingRequest{Provider: "openai", Model: "gpt-test", APIKey: "TEST-SECRET"}
+	client := &fakeNamingClient{fn: func(context.Context, string) (string, error) {
+		return "Summons", nil
+	}}
+	s.namingClientFactory = func(NamingRequest, http.RoundTripper) (namingClient, error) { return client, nil }
+	r, err := s.Download(context.Background(), req, nil)
+	if err != nil || !r.Documents[0].Saved || r.Documents[0].Naming.Source != "ai" || r.Documents[0].Naming.Label != "Summons" {
+		t.Fatalf("scanned pages did not produce an AI name: %+v %v", r, err)
+	}
+	if len(client.calls) != 1 || client.calls[0].Text != "" || len(client.calls[0].Images) != 2 {
+		t.Fatalf("provider did not receive exactly two opening-page images: %+v", client.calls)
+	}
+}
+
 func TestNamingExpansionCostsTwoCompleteAttempts(t *testing.T) {
 	lines := []string{"DEFENDANT'S MOTION TO COMPEL DISCOVERY"}
 	for i := 0; i < 16; i++ {
@@ -220,11 +237,11 @@ func TestNamingExpansionCostsTwoCompleteAttempts(t *testing.T) {
 	}}
 	s.namingClientFactory = func(NamingRequest, http.RoundTripper) (namingClient, error) { return client, nil }
 	r, err := s.Download(context.Background(), req, nil)
-	if err != nil || r.Documents[0].Naming.Source != "ai" || r.Documents[0].Naming.Calls != 2 || len(client.calls) != 2 || len(client.calls[1]) <= len(client.calls[0]) {
+	if err != nil || r.Documents[0].Naming.Source != "ai" || r.Documents[0].Naming.Calls != 2 || len(client.calls) != 2 || len(client.calls[1].Text) <= len(client.calls[0].Text) {
 		t.Fatalf("bounded expansion failed: %+v %v, calls=%d", r, err, len(client.calls))
 	}
 	u := r.Documents[0].Naming.Usage
-	if u == nil || u.RequestBytes != u.InputTokenEstimate || u.RequestBytes < len(client.calls[0])+len(client.calls[1]) || u.Reported {
+	if u == nil || u.RequestBytes != u.InputTokenEstimate || u.RequestBytes < len(client.calls[0].Text)+len(client.calls[1].Text) || u.Reported {
 		t.Fatalf("attempt costs not aggregated or mislabeled: %+v", u)
 	}
 }
@@ -271,6 +288,9 @@ func TestNamingRejectsUnsafeAndUnsupportedLabels(t *testing.T) {
 	}
 	if label, reason := normalizeNamingLabel("Defendant Second Amended Motion to Compel", evidence); label == "" || reason != "" {
 		t.Fatalf("grounded label rejected: %q, %q", label, reason)
+	}
+	if label, reason := normalizeNamingLabel("Summons - Filer Prepared", "Type: SUMMONS - FILER PREPARED\nSo Ordered"); label == "" || reason != "" {
+		t.Fatalf("label without administrative heading prefix rejected: %q, %q", label, reason)
 	}
 }
 

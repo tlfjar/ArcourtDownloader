@@ -85,10 +85,10 @@ func TestNamingRequestRequiresSavedRecipientConsentAndKey(t *testing.T) {
 		name, consent, key  string
 		enabled, wantNaming bool
 	}{
-		{name: "disabled", consent: namingRecipient("openai"), key: "test-secret", wantNaming: false},
+		{name: "disabled", consent: namingConsentValue("openai"), key: "test-secret", wantNaming: false},
 		{name: "no consent", key: "test-secret", enabled: true},
-		{name: "no key", consent: namingRecipient("openai"), enabled: true},
-		{name: "enabled", consent: namingRecipient("openai"), key: "test-secret", enabled: true, wantNaming: true},
+		{name: "no key", consent: namingConsentValue("openai"), enabled: true},
+		{name: "enabled", consent: namingConsentValue("openai"), key: "test-secret", enabled: true, wantNaming: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			requests := make(chan arcourt.DownloadRequest, 1)
@@ -171,11 +171,15 @@ func TestNamingCredentialActionsStayOutsidePreferences(t *testing.T) {
 
 func TestNamingSettingsRequireCurrentRecipient(t *testing.T) {
 	c := namingController(t, Preferences{}, &fakeSecretStore{}, fakeService{})
-	p := Preferences{NamingEnabled: true, NamingProvider: "xai", NamingModel: "grok-test", NamingConsentRecipient: namingRecipient("openai")}
+	p := Preferences{NamingEnabled: true, NamingProvider: "xai", NamingModel: "grok-test", NamingConsentRecipient: namingConsentValue("openai")}
 	if err := c.SavePreferences(p); err == nil {
 		t.Fatal("stale consent accepted")
 	}
 	p.NamingConsentRecipient = namingRecipient("xai")
+	if err := c.SavePreferences(p); err == nil {
+		t.Fatal("pre-image disclosure consent accepted")
+	}
+	p.NamingConsentRecipient = namingConsentValue("xai")
 	if err := c.SavePreferences(p); err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +198,7 @@ func TestNamingSettingsRequireCurrentRecipient(t *testing.T) {
 
 func TestNamingSettingsRejectModelIDsCoreCannotUse(t *testing.T) {
 	c := namingController(t, Preferences{}, &fakeSecretStore{}, fakeService{})
-	p := Preferences{NamingEnabled: true, NamingProvider: "openai", NamingModel: "gpt-4o:latest", NamingConsentRecipient: namingRecipient("openai")}
+	p := Preferences{NamingEnabled: true, NamingProvider: "openai", NamingModel: "gpt-4o:latest", NamingConsentRecipient: namingConsentValue("openai")}
 	if err := c.SavePreferences(p); err != nil {
 		t.Fatalf("valid model rejected: %v", err)
 	}

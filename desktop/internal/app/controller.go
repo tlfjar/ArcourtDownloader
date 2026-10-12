@@ -310,7 +310,7 @@ func (c *Controller) Download(generation uint64) error {
 	req := arcourt.DownloadRequest{CaseNumber: c.state.CaseNumber, Selection: selection, OutputDirectory: prefs.OutputDirectory}
 	if prefs.NamingEnabled {
 		switch {
-		case prefs.NamingConsentRecipient != namingRecipient(prefs.NamingProvider):
+		case prefs.NamingConsentRecipient != namingConsentValue(prefs.NamingProvider):
 			c.state.NamingNotice = "AI naming skipped: review and consent to the selected provider in Settings. Standard filenames will be used."
 		case c.secrets == nil:
 			c.state.NamingNotice = "AI naming skipped: secure credential storage is unavailable. Standard filenames will be used."
