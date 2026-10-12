@@ -125,11 +125,6 @@ func (f *BrowserFetcher) openBrowser(parent context.Context, timeout time.Durati
 		cleanup()
 		return nil, nil, err
 	}
-	recordProfileCleanupError := func() {
-		f.mu.Lock()
-		f.cleanupErr = errors.Join(f.cleanupErr, errors.New("could not remove an application temporary browser profile; check temporary-directory permissions and file locks"))
-		f.mu.Unlock()
-	}
 	var (
 		browserCtx context.Context
 		err        error
@@ -159,8 +154,12 @@ func (f *BrowserFetcher) openBrowser(parent context.Context, timeout time.Durati
 			stopBrowser()
 			stopBrowser = nil
 		}
-		if removeBrowserProfile(profile) != nil {
-			recordProfileCleanupError()
+		if err := removeBrowserProfile(profile); err != nil {
+			// Never launch another browser while a failed attempt's profile is
+			// still present. Keep the path so cleanup can make one final bounded
+			// removal attempt before recording the cleanup failure.
+			cleanup()
+			return nil, nil, f.startupError("launch cleanup", timeout, attempts, err)
 		}
 		profile = ""
 		timer := time.NewTimer(browserLaunchRetryDelays[attempts-1])
