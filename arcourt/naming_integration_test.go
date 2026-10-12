@@ -131,6 +131,36 @@ func TestNamingRejectsUnsafeOutputWithoutFailingDownload(t *testing.T) {
 	}
 }
 
+func TestNamingMissingHeadingQualifierUsesStandardFilename(t *testing.T) {
+	pdf := syntheticNamingPDF([]string{"ENTERED ORDER VACATING HEARING", "The court vacates the hearing."})
+	s, f, req := namingDownloadFixture(t, 1, pdf)
+	req.Selection[0].DocketDescription = "Hearing docket entry"
+	f.entries[0].DocketDescription = req.Selection[0].DocketDescription
+	req.Naming = &NamingRequest{Provider: "openai", Model: "gpt-test", APIKey: "TEST-SECRET"}
+	client := &fakeNamingClient{fn: func(context.Context, string) (string, error) {
+		return "Order Vacating Hearing", nil // Omits the entered status in the heading.
+	}}
+	s.namingClientFactory = func(NamingRequest, http.RoundTripper) (namingClient, error) { return client, nil }
+	r, err := s.Download(context.Background(), req, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertLocalCounts(t, r, DownloadCounts{Selected: 1, Succeeded: 1})
+	d := r.Documents[0]
+	if !d.Saved || d.Naming == nil || d.Naming.Source != "deterministic" || d.Naming.Reason != "unsupported_result" || d.Naming.Calls != 1 ||
+		!strings.Contains(d.Filename, "hearing_docket_entry") || strings.Contains(d.Filename, "order_vacating_hearing") {
+		t.Fatalf("rejected label did not use the docket filename: %+v", d)
+	}
+	saved, readErr := os.ReadFile(filepath.Join(r.Directory, d.Filename))
+	if readErr != nil || !bytes.Equal(saved, pdf) {
+		t.Fatalf("fallback changed PDF bytes: %v", readErr)
+	}
+	again, err := s.Download(context.Background(), req, nil)
+	if err != nil || again.Documents[0].SkipReason != SkipVerified || again.Documents[0].Filename != d.Filename || len(client.calls) != 1 {
+		t.Fatalf("verified fallback repeated naming or changed filename: %+v %v", again, err)
+	}
+}
+
 func TestNamingCancellationPublishesValidatedPDFWithFallback(t *testing.T) {
 	pdf := syntheticNamingPDF([]string{"DEFENDANT'S MOTION TO COMPEL", "Defendant asks for discovery."})
 	s, _, req := namingDownloadFixture(t, 2, pdf)

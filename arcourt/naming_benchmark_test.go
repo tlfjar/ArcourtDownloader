@@ -299,6 +299,7 @@ type namingBenchCaseResult struct {
 	Expected                 []string `json:"acceptable_labels,omitempty"`
 	Label                    string   `json:"label,omitempty"`
 	Fallback                 string   `json:"fallback_reason,omitempty"`
+	OutputDiagnostics        []string `json:"output_diagnostics,omitempty"`
 	Correct                  bool     `json:"correct_useful_label"`
 	MaterialError            bool     `json:"material_error"`
 	Calls                    int      `json:"naming_calls"`
@@ -633,8 +634,15 @@ func TestNamingBenchmark(t *testing.T) {
 				transport = &benchmarkBudget{base: replayTransport(sample), maxCalls: maxNamingCalls, maxRequestBytes: maxProviderRequestBytes * maxNamingCalls}
 			}
 			beforeCalls, beforeBytes, _ := transport.snapshot()
+			var outputDiagnostics []string
 			session := newNamingSession(cfg, func(n NamingRequest, _ http.RoundTripper) (namingClient, error) {
-				return newProviderClient(n, transport)
+				client, err := newProviderClient(n, transport)
+				if err != nil {
+					return nil, err
+				}
+				return benchmarkDiagnosticClient{namingClient: client, observe: func(raw, excerpt string) {
+					outputDiagnostics = append(outputDiagnostics, namingBenchmarkOutputDiagnostic(raw, excerpt))
+				}}, nil
 			})
 			outcome := session.nameEvidence(ctx, evidence)
 			cancel()
@@ -643,7 +651,7 @@ func TestNamingBenchmark(t *testing.T) {
 			result := namingBenchCaseResult{
 				ID: sample.ID, Split: sample.Split, Cohort: sample.Cohort,
 				Expected: append([]string(nil), sample.Acceptable...),
-				Label:    outcome.Label, Fallback: outcome.Reason,
+				Label:    outcome.Label, Fallback: outcome.Reason, OutputDiagnostics: outputDiagnostics,
 				Calls: outcome.Calls, TransmittedCalls: transmittedCalls,
 				RequestBytes:        transmittedBytes,
 				LatencyMilliseconds: time.Since(started).Milliseconds(),

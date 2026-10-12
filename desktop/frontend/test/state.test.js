@@ -27,6 +27,9 @@ test('display preserves separate service outcomes, including partial results', (
 
 test('naming detail distinguishes AI labels and ordinary fallback', () => {
   assert.equal(namingDetail({ source: 'ai', label: 'Motion to Dismiss' }), 'AI label: Motion to Dismiss');
-  assert.equal(namingDetail({ source: 'deterministic', reason: 'image_only' }), 'Standard filename (image only)');
+  assert.equal(namingDetail({ source: 'deterministic', reason: 'image_only' }), 'Standard filename (scanned or image-only PDF)');
+  assert.equal(namingDetail({ source: 'deterministic', reason: 'unsupported_result' }), 'Standard filename (model label did not match the title)');
+  assert.equal(namingDetail({ source: 'deterministic', reason: 'unexpected' }), 'Standard filename (naming unavailable)');
+  assert.equal(namingDetail({ source: 'deterministic', reason: 'constructor' }), 'Standard filename (naming unavailable)');
   assert.equal(namingDetail(null), '');
 });

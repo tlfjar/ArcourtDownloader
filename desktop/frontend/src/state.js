@@ -21,9 +21,32 @@ export function totals(c) {
 
 export function doneCount(c) { return c.Succeeded + c.Skipped + c.Failed + c.Unavailable + c.Canceled; }
 
+const namingFallbackReasons = {
+  image_only: 'scanned or image-only PDF',
+  too_large: 'PDF too large for naming',
+  encrypted: 'encrypted PDF',
+  unreadable: 'no usable text',
+  insufficient_context: 'title unclear',
+  unsafe_result: 'model label could not be used',
+  unsupported_result: 'model label did not match the title',
+  length_exhaustion: 'label too long',
+  configuration: 'naming setup incomplete',
+  provider_auth: 'provider rejected the API key',
+  provider_model: 'model unavailable',
+  rate_limited: 'provider rate limit',
+  provider_refusal: 'provider declined naming',
+  provider_error: 'provider error',
+  payload_limit: 'request too large',
+  canceled: 'naming canceled',
+  timeout: 'naming timed out',
+};
+
 export function namingDetail(n) {
   if (!n) return '';
   if (n.source === 'ai' && n.label) return `AI label: ${n.label}`;
-  if (n.source === 'deterministic') return n.reason ? `Standard filename (${n.reason.replaceAll('_', ' ')})` : 'Standard filename';
+  if (n.source === 'deterministic') {
+    const detail = Object.hasOwn(namingFallbackReasons, n.reason) ? namingFallbackReasons[n.reason] : 'naming unavailable';
+    return n.reason ? `Standard filename (${detail})` : 'Standard filename';
+  }
   return 'Standard filename';
 }
