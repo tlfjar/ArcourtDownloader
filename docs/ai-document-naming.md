@@ -254,6 +254,8 @@ A confirming v5 rerun under `title-excerpt-v3` is recorded at `build/naming-benc
 
 These are single runs of one OpenAI model against generated fixtures. They do not establish accuracy on real court documents, do not transfer to other providers or model IDs, and the one-case differences between strategies remain within ordinary model variation rather than evidence of an excerpt-size effect.
 
+Code review after that run produced two corrections. `namingWords` now keeps ASCII digits, so a numeric identifier such as `Exhibit 1` can survive into a label instead of always falling back; previously any heading containing a digit could never satisfy `preservesNamingHeading`. The extractor's opening-title protection, formerly limited to orders and judgments, now covers any supported document type at the top of the first page, so a quoted later heading such as a reproduced response can no longer outscore the document's own title. Both changes were made after the v6 measurement, so the offline v6 replay was repeated to confirm it still selects identical headings and accepts identical labels at 32/32 and 26,898 complete request bytes per strategy, byte-identical to the pre-change replay. No live v6 case was affected: that run recorded no digit-related rejection, and its only readable miss was an abstention. The recorded live results therefore still describe the shipped behavior on this corpus, though they were produced at revision `90fcd94`.
+
 ## Evaluating an additional provider or model
 
 Only OpenAI `gpt-6-luna` has completed this evaluation. To qualify another provider or model, run the same frozen procedure rather than reusing an already-measured corpus:

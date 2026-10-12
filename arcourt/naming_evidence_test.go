@@ -117,6 +117,25 @@ func TestNamingEvidenceKeepsOpeningOrderAheadOfQuotedResponse(t *testing.T) {
 	}
 }
 
+func TestNamingEvidenceKeepsOpeningTitleAheadOfQuotedResponse(t *testing.T) {
+	for _, title := range []string{
+		"MOTION TO DISMISS",
+		"PETITION FOR WRIT OF MANDAMUS",
+		"SECOND AMENDED COMPLAINT",
+	} {
+		data := syntheticNamingPDF([]string{
+			title,
+			"The filing below is quoted from the docket for context.",
+			"DEFENDANT'S RESPONSE TO MOTION TO DISMISS",
+			"The response is reproduced only as an attachment.",
+		})
+		e := evidenceFromBytes(data)
+		if e.Reason != "" || !strings.HasPrefix(e.Small, title) {
+			t.Fatalf("quoted response displaced opening title %q: %+v", title, e)
+		}
+	}
+}
+
 func TestNamingEvidenceRetainsSeparateMaterialQualifiers(t *testing.T) {
 	for _, tc := range []struct {
 		lines []string

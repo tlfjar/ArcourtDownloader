@@ -266,12 +266,12 @@ func selectNamingLines(pages [][]namingLine) []string {
 			if isMostlyUpper(line.text) {
 				score += 20
 			}
-			// An adjudicative title at the very start is often
-			// followed by an all-caps quotation of the filing being ruled on.
-			// Preserve the opening title in that layout rather than treating
-			// the quoted response as the document's own heading.
-			if pi == 0 && i == 0 &&
-				(namingStartsWithType(line.text, "order") || namingStartsWithType(line.text, "judgment")) {
+			// A document's own title on the opening line is often followed by
+			// an all-caps quotation of the filing it addresses, such as an
+			// order restating the motion it rules on or a motion restating the
+			// order it attacks. Preserve that opening title rather than letting
+			// the quoted later heading outscore it.
+			if pi == 0 && i == 0 && namingOpensWithTitle(line.text) {
 				score += 50
 			}
 			// A response, reply, amended filing, or proposed/entered order
@@ -376,6 +376,21 @@ func selectNamingLines(pages [][]namingLine) []string {
 func namingStartsWithType(line, kind string) bool {
 	lower := strings.ToLower(strings.TrimSpace(line))
 	return strings.HasPrefix(lower, kind+" ") || lower == kind
+}
+
+// namingOpensWithTitle reports whether a line begins with a supported document
+// type, allowing leading status qualifiers such as PROPOSED or SECOND AMENDED.
+func namingOpensWithTitle(line string) bool {
+	lower := strings.ToLower(strings.TrimSpace(line))
+	for {
+		loc := namingStatusQualifier.FindStringIndex(lower)
+		if loc == nil || loc[0] != 0 {
+			break
+		}
+		lower = strings.TrimSpace(lower[loc[1]:])
+	}
+	loc := namingLabelType.FindStringIndex(lower)
+	return loc != nil && loc[0] == 0
 }
 
 func isMostlyUpper(s string) bool {

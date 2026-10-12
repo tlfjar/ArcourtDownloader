@@ -245,8 +245,13 @@ func namingHeadingContinues(line string) bool {
 	}
 }
 
+// namingWords splits on anything that cannot appear inside a label word. ASCII
+// digits are kept because headings and labels both carry identifiers such as
+// "Exhibit 1", which must survive rather than forcing a fallback.
 func namingWords(s string) []string {
-	return strings.FieldsFunc(s, func(r rune) bool { return !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z') })
+	return strings.FieldsFunc(s, func(r rune) bool {
+		return !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
+	})
 }
 
 // namingWordIndex reports where word next appears at or after from, so callers

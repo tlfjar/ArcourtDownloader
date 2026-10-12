@@ -289,6 +289,8 @@ func TestNamingPreservesClearHeadingDistinctions(t *testing.T) {
 		{"BRIEF IN REPLY TO OPPOSITION\nMovant answers the opposition.", "Reply Brief to Opposition"},
 		{"ENTERED ORDER CONFIRMING SALE\nThe sale is confirmed.", "Order Confirming Sale (Entered)"},
 		{"ORDER GRANTING MOTION TO DISMISS\nThe court grants relief.", "Motion to Dismiss Order Granting"},
+		{"EXHIBIT 1\nSynthetic attachment.", "Exhibit 2"},
+		{"MOTION FOR SUMMARY JUDGMENT UNDER RULE 56\nMovant seeks judgment.", "Motion for Summary Judgment Under Rule"},
 	} {
 		if got, reason := normalizeNamingLabel(tc.label, tc.heading); got != "" || reason != "unsupported_result" {
 			t.Errorf("%q from %q: got %q, %q", tc.label, tc.heading, got, reason)
@@ -305,6 +307,8 @@ func TestNamingPreservesClearHeadingDistinctions(t *testing.T) {
 		{"ENTERED ORDER CONFIRMING SALE\nThe sale is confirmed.", "Entered Order Confirming Sale"},
 		{"DEFENDANT'S RESPONSE TO\nPLAINTIFF'S MOTION TO DISMISS\nDefendant opposes dismissal.", "Defendant Response to Motion to Dismiss"},
 		{"EXHIBIT A\nSynthetic attachment.", "Exhibit A"},
+		{"EXHIBIT 1\nSynthetic attachment.", "Exhibit 1"},
+		{"MOTION FOR SUMMARY JUDGMENT UNDER RULE 56\nMovant seeks judgment.", "Motion for Summary Judgment Under Rule 56"},
 	} {
 		if got, reason := normalizeNamingLabel(tc.label, tc.heading); got == "" || reason != "" {
 			t.Errorf("complete heading label %q rejected from %q: %q, %q", tc.label, tc.heading, got, reason)

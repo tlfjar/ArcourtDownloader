@@ -23,7 +23,7 @@ func validateCredential(provider, key string) (string, error) {
 	}
 	key = strings.TrimSpace(key)
 	if key == "" || len(key) > 2048 || strings.IndexFunc(key, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
-		return "", errors.New("Enter a provider API key of at most 2048 characters without control characters.")
+		return "", errors.New("Enter a provider API key of at most 2048 bytes without control characters.")
 	}
 	return key, nil
 }
