@@ -286,6 +286,9 @@ func TestNamingPreservesClearHeadingDistinctions(t *testing.T) {
 		{"FIFTH AMENDED COMPLAINT\nPlaintiff files another version.", "Amended Complaint"},
 		{"NOTICE OF SUBSTITUTION OF COUNSEL\nNew counsel appears.", "Notice of Counsel"},
 		{"ORDER DISMISSING WITHOUT PREJUDICE\nThe matter is dismissed.", "Order Dismissing"},
+		{"BRIEF IN REPLY TO OPPOSITION\nMovant answers the opposition.", "Reply Brief to Opposition"},
+		{"ENTERED ORDER CONFIRMING SALE\nThe sale is confirmed.", "Order Confirming Sale (Entered)"},
+		{"ORDER GRANTING MOTION TO DISMISS\nThe court grants relief.", "Motion to Dismiss Order Granting"},
 	} {
 		if got, reason := normalizeNamingLabel(tc.label, tc.heading); got != "" || reason != "unsupported_result" {
 			t.Errorf("%q from %q: got %q, %q", tc.label, tc.heading, got, reason)
@@ -298,6 +301,8 @@ func TestNamingPreservesClearHeadingDistinctions(t *testing.T) {
 		{"FIFTH AMENDED COMPLAINT\nPlaintiff files another version.", "Fifth Amended Complaint"},
 		{"NOTICE OF SUBSTITUTION OF COUNSEL\nNew counsel appears.", "Notice of Substitution of Counsel"},
 		{"ORDER DISMISSING WITHOUT PREJUDICE\nThe matter is dismissed.", "Order Dismissing Without Prejudice"},
+		{"BRIEF IN REPLY TO OPPOSITION\nMovant answers the opposition.", "Brief in Reply to Opposition"},
+		{"ENTERED ORDER CONFIRMING SALE\nThe sale is confirmed.", "Entered Order Confirming Sale"},
 		{"DEFENDANT'S RESPONSE TO\nPLAINTIFF'S MOTION TO DISMISS\nDefendant opposes dismissal.", "Defendant Response to Motion to Dismiss"},
 		{"EXHIBIT A\nSynthetic attachment.", "Exhibit A"},
 	} {

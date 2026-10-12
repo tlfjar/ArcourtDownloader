@@ -153,7 +153,10 @@ func namingBenchmarkCorpus() []namingBenchCase {
 
 func TestNamingBenchmarkCorpusValidity(t *testing.T) {
 	seen := map[string]bool{}
-	for _, sample := range append(append(namingBenchmarkCorpus(), namingBenchmarkCorpusV4()...), namingBenchmarkCorpusV5()...) {
+	corpora := append(namingBenchmarkCorpus(), namingBenchmarkCorpusV4()...)
+	corpora = append(corpora, namingBenchmarkCorpusV5()...)
+	corpora = append(corpora, namingBenchmarkCorpusV6()...)
+	for _, sample := range corpora {
 		if seen[sample.ID] {
 			t.Fatalf("duplicate synthetic case %s", sample.ID)
 		}
@@ -472,7 +475,7 @@ func namingBenchmarkCorrectLabel(version string, c namingBenchCase, label string
 		return false
 	}
 	for _, acceptable := range c.Acceptable {
-		if version == "synthetic-court-v4" || version == "synthetic-court-v5" {
+		if version == "synthetic-court-v4" || version == "synthetic-court-v5" || version == "synthetic-court-v6" {
 			if namingBenchmarkCanonicalV4(label) == namingBenchmarkCanonicalV4(acceptable) {
 				return true
 			}
@@ -557,6 +560,9 @@ func TestNamingBenchmark(t *testing.T) {
 	case "v5":
 		corpusVersion, scoringVersion = "synthetic-court-v5", "predeclared-alias-v1"
 		corpus = namingBenchmarkCorpusV5()
+	case "v6":
+		corpusVersion, scoringVersion = "synthetic-court-v6", "predeclared-alias-v1"
+		corpus = namingBenchmarkCorpusV6()
 	default:
 		t.Fatalf("unsupported benchmark corpus %q", corpusChoice)
 	}

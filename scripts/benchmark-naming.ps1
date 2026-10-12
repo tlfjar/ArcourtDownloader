@@ -1,11 +1,12 @@
 param(
     [switch]$Live,
-    [ValidateSet('v3', 'v4', 'v5')][string]$Corpus = 'v3',
+    [ValidateSet('v3', 'v4', 'v5', 'v6')][string]$Corpus = 'v3',
     [ValidateSet('openai', 'xai', 'anthropic', 'google')][string]$Provider,
     [string]$Model,
     [int]$MaxCalls,
     [int]$MaxRequestBytes,
     [switch]$AcknowledgeCharges,
+    [string]$KeyEnvironmentVariable,
     [string]$ReportPath
 )
 
@@ -32,18 +33,26 @@ if ($Live) {
     }
     Write-Host "Live synthetic evaluation: $Provider / $Model, corpus $Corpus. Only generated fixture excerpts leave this computer. Requests may incur charges."
     Write-Host "Hard limits: $MaxCalls transmitted calls, $MaxRequestBytes total serialized request bytes, and 96 output tokens per call."
-    $secureKey = Read-Host 'Enter the provider API key for this run' -AsSecureString
-    $keyPointer = [IntPtr]::Zero
-    try {
-        $keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
-        $plainKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer)
-    } finally {
-        if ($keyPointer -ne [IntPtr]::Zero) {
-            [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer)
+    if ($KeyEnvironmentVariable) {
+        if ($KeyEnvironmentVariable -eq 'ARCOURT_BENCH_KEY') {
+            throw '-KeyEnvironmentVariable must name a separate variable; ARCOURT_BENCH_KEY is set by this script.'
+        }
+        $plainKey = [Environment]::GetEnvironmentVariable($KeyEnvironmentVariable, 'Process')
+        Write-Host "Reading the provider API key from the $KeyEnvironmentVariable environment variable."
+    } else {
+        $secureKey = Read-Host 'Enter the provider API key for this run' -AsSecureString
+        $keyPointer = [IntPtr]::Zero
+        try {
+            $keyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureKey)
+            $plainKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($keyPointer)
+        } finally {
+            if ($keyPointer -ne [IntPtr]::Zero) {
+                [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($keyPointer)
+            }
         }
     }
     if ([string]::IsNullOrWhiteSpace($plainKey)) { throw 'A key must be intentionally supplied for the live run.' }
-} elseif ($Provider -or $Model -or $MaxCalls -or $MaxRequestBytes -or $AcknowledgeCharges) {
+} elseif ($Provider -or $Model -or $MaxCalls -or $MaxRequestBytes -or $AcknowledgeCharges -or $KeyEnvironmentVariable) {
     throw 'Provider, model, budgets, and charge acknowledgement are live-only options; add -Live for a paid synthetic run.'
 }
 
