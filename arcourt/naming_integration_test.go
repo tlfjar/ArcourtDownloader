@@ -56,7 +56,9 @@ func TestNamingUsesVerifiedPDFBeforeNoOverwritePublication(t *testing.T) {
 	req.Selection[0].DocketDescription = "Generic Docket Label DO-NOT-SEND"
 	f.entries[0].DocketDescription = req.Selection[0].DocketDescription
 	req.Naming = &NamingRequest{Provider: "openai", Model: "gpt-test", APIKey: "TEST-SECRET"}
-	client := &fakeNamingClient{}
+	client := &fakeNamingClient{fn: func(context.Context, string) (string, error) {
+		return "Defendant Motion to Compel Discovery", nil
+	}}
 	s.namingClientFactory = func(NamingRequest, http.RoundTripper) (namingClient, error) { return client, nil }
 	preview, err := s.Preview(context.Background(), req.CaseNumber)
 	if err != nil || len(preview.DocketEntries) != 1 || len(client.calls) != 0 {
@@ -68,7 +70,7 @@ func TestNamingUsesVerifiedPDFBeforeNoOverwritePublication(t *testing.T) {
 	}
 	assertLocalCounts(t, r, DownloadCounts{Selected: 1, Succeeded: 1})
 	d := r.Documents[0]
-	if d.Naming == nil || d.Naming.Source != "ai" || d.Naming.Label != "Defendant Motion to Compel" || d.Naming.Calls != 1 || !strings.Contains(d.Filename, "defendant_motion_to_compel") {
+	if d.Naming == nil || d.Naming.Source != "ai" || d.Naming.Label != "Defendant Motion to Compel Discovery" || d.Naming.Calls != 1 || !strings.Contains(d.Filename, "defendant_motion_to_compel_discovery") {
 		t.Fatalf("naming outcome: %+v", d)
 	}
 	if d.Description != req.Selection[0].DocketDescription {
@@ -214,7 +216,7 @@ func TestNamingExpansionCostsTwoCompleteAttempts(t *testing.T) {
 		if len(excerpt) <= 512 {
 			return "ABSTAIN", nil
 		}
-		return "Defendant Motion to Compel", nil
+		return "Defendant Motion to Compel Discovery", nil
 	}}
 	s.namingClientFactory = func(NamingRequest, http.RoundTripper) (namingClient, error) { return client, nil }
 	r, err := s.Download(context.Background(), req, nil)
@@ -280,13 +282,31 @@ func TestNamingPreservesClearHeadingDistinctions(t *testing.T) {
 		{"SECOND AMENDED COMPLAINT\nPlaintiff pleads amended facts.", "Amended Complaint"},
 		{"PLAINTIFF'S REPLY TO RESPONSE\nPlaintiff replies.", "Reply to Response"},
 		{"PROPOSED\nORDER DENYING MOTION\nSubmitted for review.", "Order Denying Motion"},
+		{"ENTERED ORDER VACATING HEARING\nThe hearing is vacated.", "Entered Order Hearing"},
+		{"FIFTH AMENDED COMPLAINT\nPlaintiff files another version.", "Amended Complaint"},
+		{"NOTICE OF SUBSTITUTION OF COUNSEL\nNew counsel appears.", "Notice of Counsel"},
+		{"ORDER DISMISSING WITHOUT PREJUDICE\nThe matter is dismissed.", "Order Dismissing"},
 	} {
 		if got, reason := normalizeNamingLabel(tc.label, tc.heading); got != "" || reason != "unsupported_result" {
 			t.Errorf("%q from %q: got %q, %q", tc.label, tc.heading, got, reason)
 		}
 	}
-	if got, reason := normalizeNamingLabel("Defendant Response to Motion to Dismiss", "DEFENDANT'S RESPONSE TO MOTION TO DISMISS\nDefendant opposes dismissal."); got == "" || reason != "" {
-		t.Fatalf("complete heading label rejected: %q, %q", got, reason)
+	for _, tc := range []struct{ heading, label string }{
+		{"DEFENDANT'S RESPONSE TO MOTION TO DISMISS\nDefendant opposes dismissal.", "Defendant Response to Motion to Dismiss"},
+		{"PLAINTIFF'S REPLY TO DEFENDANT'S RESPONSE\nPlaintiff replies.", "Plaintiff Reply to Response"},
+		{"ENTERED ORDER VACATING HEARING\nThe hearing is vacated.", "Entered Order Vacating Hearing"},
+		{"FIFTH AMENDED COMPLAINT\nPlaintiff files another version.", "Fifth Amended Complaint"},
+		{"NOTICE OF SUBSTITUTION OF COUNSEL\nNew counsel appears.", "Notice of Substitution of Counsel"},
+		{"ORDER DISMISSING WITHOUT PREJUDICE\nThe matter is dismissed.", "Order Dismissing Without Prejudice"},
+		{"DEFENDANT'S RESPONSE TO\nPLAINTIFF'S MOTION TO DISMISS\nDefendant opposes dismissal.", "Defendant Response to Motion to Dismiss"},
+		{"EXHIBIT A\nSynthetic attachment.", "Exhibit A"},
+	} {
+		if got, reason := normalizeNamingLabel(tc.label, tc.heading); got == "" || reason != "" {
+			t.Errorf("complete heading label %q rejected from %q: %q, %q", tc.label, tc.heading, got, reason)
+		}
+	}
+	if got, reason := normalizeNamingLabel("Exhibit", "EXHIBIT A\nSynthetic attachment."); got != "" || reason != "unsupported_result" {
+		t.Fatalf("exhibit identifier was not preserved: %q, %q", got, reason)
 	}
 }
 

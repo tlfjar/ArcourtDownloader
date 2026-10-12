@@ -124,6 +124,8 @@ func TestNamingEvidenceRetainsSeparateMaterialQualifiers(t *testing.T) {
 	}{
 		{[]string{"PROPOSED", "ORDER GRANTING MOTION", "Submitted for the court's consideration."}, "PROPOSED\nORDER GRANTING MOTION"},
 		{[]string{"SECOND AMENDED", "COMPLAINT", "Plaintiff alleges additional facts."}, "SECOND AMENDED\nCOMPLAINT"},
+		{[]string{"FIFTH AMENDED", "COMPLAINT", "Plaintiff alleges additional facts."}, "FIFTH AMENDED\nCOMPLAINT"},
+		{[]string{"VERIFIED", "PETITION FOR WRIT OF MANDAMUS", "Petitioner verifies the allegations."}, "VERIFIED\nPETITION FOR WRIT OF MANDAMUS"},
 	} {
 		e := evidenceFromBytes(syntheticNamingPDF(tc.lines))
 		if e.Reason != "" || !strings.HasPrefix(e.Small, tc.want) {

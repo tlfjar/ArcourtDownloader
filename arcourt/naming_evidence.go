@@ -38,9 +38,9 @@ const (
 )
 
 var namingTypeWord = regexp.MustCompile(`(?i)\b(motion|order|response|reply|complaint|petition|affidavit|brief|notice|exhibit|summons|subpoena|judgment|writ|certificate|objection|application|memorandum|stipulation|declaration|pleading|answer|discovery|interrogator(?:y|ies))\b`)
-var namingMaterialQualifier = regexp.MustCompile(`(?i)\b(response|reply|proposed|entered|amended|first|second|third|fourth|granting|denying)\b`)
+var namingMaterialQualifier = regexp.MustCompile(`(?i)\b(response|reply|proposed|entered|verified|amended|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|granting|denying|dismissing|vacating|partial|opposition|withdrawal)\b`)
 var namingResponseOrReply = regexp.MustCompile(`(?i)\b(response|reply)\b`)
-var namingStatusQualifier = regexp.MustCompile(`(?i)\b(proposed|entered|amended|first|second|third|fourth)\b`)
+var namingStatusQualifier = regexp.MustCompile(`(?i)\b(proposed|entered|verified|amended|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b`)
 
 // ExtractNamingEvidence reads only the first two pages of a complete local PDF.
 // The parser traverses the page tree to locate them (up to its 50,000-node,
