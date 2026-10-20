@@ -163,8 +163,12 @@ func (w *localWriter) Commit() (err error) {
 				return err
 			}
 		}
-		if err = s.disk.check("publish.link", name); err == nil {
-			err = s.disk.root.Link(w.temp, name)
+		operation := "publish.link"
+		if s.disk.move != nil {
+			operation = "publish.move"
+		}
+		if err = s.disk.check(operation, name); err == nil {
+			err = s.disk.publish(w.temp, name)
 		}
 		if errors.Is(err, os.ErrExist) {
 			if err = s.disk.remove(w.receipt); err != nil {
@@ -177,7 +181,10 @@ func (w *localWriter) Commit() (err error) {
 			return err
 		}
 		w.published = true
-		// Keep the receipt AND complete temp hard link until the manifest is safe.
+		if s.disk.move != nil {
+			w.temp = ""
+		} // source was consumed; never unlink a later replacement
+		// Keep the receipt (and, for hard links, the complete witness) until the manifest is safe.
 		// Abort after a failed commit must preserve this recovery evidence.
 		s.put(w.record)
 		if err = s.save(); err != nil {

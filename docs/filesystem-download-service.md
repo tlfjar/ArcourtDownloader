@@ -77,7 +77,7 @@ Full original text is preserved in the manifest. URLs are never used as paths.
 
 With an explicit `DownloadRequest.Naming`, the service can select an AI label
 from bounded opening-page text after the staged PDF has been independently
-checked, before the recovery receipt and no-overwrite hard link are created.
+checked, before the recovery receipt and no-overwrite publication operation.
 Accepted labels are at most 64 ASCII bytes and are combined with the existing
 filing-date and 16-hex identity convention. The complete basename remains at
 most 120 bytes, including the PDF extension and collision suffix. The label is
@@ -119,26 +119,65 @@ controlled naming fallback reason, not `ErrDocumentsIncomplete`.
 
 Before publishing, the service writes a complete versioned recovery receipt
 `.arcourt-receipt-<nonce>.json` describing the case, document, temporary name,
-intended final name, size, and hash. It then creates a **hard link** from the closed
-temporary file to the final filename. This is the no-overwrite publication
-primitive on both Windows and Unix; a racing existing filename makes it fail or
-choose another name. Ordinary rename is never used for PDF publication.
+intended final name, size, and hash. PDF, first-manifest, and receipt publication
+all use the same selected no-replace backend. There is no copying into a visible
+final PDF and no overwrite fallback.
 
-Supported destinations must implement local hard links and file locks, such as
-Windows NTFS and ordinary Linux/macOS local filesystems. FAT/exFAT and network
-shares are outside this version's supported output contract. Unsupported
-operations return errors; there is no fallback that copies into a visible final
-file or replaces an existing PDF. Antivirus/editor sharing conflicts on Windows
-also return errors without erasing completed PDFs.
+| Destination | Publication | Interrupted recovery |
+| --- | --- | --- |
+| Windows with hard-link capability (including NTFS) | Existing `os.Root.Link` path | Version-1 receipt plus same-file temporary witness |
+| Local Windows FAT32/exFAT without hard links | Handle-relative `FileRenameInformation`, replacement disabled; runtime probe required | Version-2 receipt; uncommitted publication requires manual review |
+| Other non-Windows local filesystems | Existing hard-link path | Existing version-1 recovery |
+| Other Windows filesystems without hard links, network shares | Rejected | No weaker fallback |
 
-After publication, the manifest is saved; only then are the receipt and complete
-temporary hard link retired. A failed manifest commit returns a failed document
-with `Saved: true`, filename, size, hash, and `ErrManifest`. The PDF remains usable,
-and its receipt and complete temporary link remain for reconciliation. A later
-run verifies that the final file and temporary witness are the **same filesystem
-file**, then verifies size/hash and records the result before retiring them.
-Identical bytes at an unrelated replacement file do not establish ownership.
-A subprocess test exercises actual process termination in this interval.
+Windows queries the volume through a contained directory handle and checks the
+hard-link capability flag. FAT32/exFAT candidates must then pass a disposable
+same-directory probe: a collision must fail without changing either file, and a
+successful publication must consume the staging name and preserve its bytes.
+The case lock has already been acquired. Access/sharing failures remain distinct
+from unsupported-capability errors; they do not trigger a different backend.
+The runtime probe is an operational prerequisite, not certification of every
+filesystem driver or removable device. See [actual test evidence](fat-filesystem-evidence.md).
+
+The new Windows operation opens the source relative to the pinned directory with
+`NtCreateFile`, rejects reparse points/nonregular files and verifies the opened
+identity, then uses `NtSetInformationFile(FileRenameInformation)` with
+`ReplaceIfExists = FALSE` and the same directory handle as `RootDirectory`.
+Microsoft documents [no-replace and directory-relative rename semantics](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information).
+A racing target produces a collision, after which PDF naming may choose a new
+suffix. Ordinary Go `Rename` is still used **only for replacing a recognized
+manifest**, never for PDF, receipt, or first-manifest publication. Path-based
+`MoveFileEx` was not selected because publication must retain directory-handle
+containment.
+
+After publication, the manifest is saved before the receipt is retired. For the
+hard-link backend, the complete temporary witness remains until this commit;
+version-1 recovery still requires the temporary and final names to refer to the
+**same filesystem file**, then verifies PDF screening, size, and SHA-256 before
+adoption. Identical bytes at an unrelated replacement never prove ownership.
+
+For FAT32/exFAT the successful rename consumes the temporary name. The service
+never deletes that old basename after success, since a later file at it is not
+owned. A version-2 receipt left by interruption is treated conservatively:
+
+- If the trusted manifest already records the same document/name/size/hash, the
+  final file passes normal repeat verification, and the temporary name remains
+  absent, only the receipt is retired. No PDF is adopted or deleted.
+- Otherwise the run stops **before network I/O**, preserves the receipt and all
+  data files, and reports `ErrRecoveryRequired`. It does not reconstruct identity
+  from hashes or FAT file IDs, which can change on rename/reuse. This includes a
+  receipt published before its PDF was renamed.
+- To proceed, use a new empty output folder. Alternatively, with no download
+  active, inspect the receipt and the specific files it names, keep any needed
+  PDFs, and move that receipt outside the case folder. Leave uncertain files
+  intact. A retry reserves existing filenames and chooses a distinct suffix.
+  Do not remove all files merely because they have an `.arcourt-` prefix.
+
+A failed manifest commit still reports `Saved: true` with filename, size, hash,
+and `ErrManifest`; the published PDF remains usable. On FAT32/exFAT the next run
+may require the manual review above. Manifest version 1 is unchanged. Only the
+new consuming backend emits version-2 receipts, so older binaries reject pending
+new receipts instead of silently treating them as hard-link witnesses.
 
 Failure/cancellation removes only the current attempt's owned incomplete files.
 It never removes previously published PDFs or sweeps temporary files by prefix.
@@ -237,7 +276,7 @@ arrives. Already saved PDFs remain usable. Hosts must use a fetcher honoring the
 existing context and sequential writer contract.
 If cancellation happens during optional naming after independent verification,
 the provider call is canceled and the already complete PDF is published under
-the deterministic filename through the bounded local receipt/link/manifest path.
+the deterministic filename through the bounded local receipt/publication/manifest path.
 The batch still reports cancellation and pending documents remain canceled.
 Portable Go cannot forcibly interrupt a blocked kernel disk operation in that
 finalization path. A remote request canceled after transmission has an uncertain
