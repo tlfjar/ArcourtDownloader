@@ -3,7 +3,9 @@
 package arcourt
 
 import (
+	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -42,4 +44,59 @@ func TestWindowsFilesystemFixture(t *testing.T) {
 		t.Fatalf("fixture is %s, expected %s", actual, expected)
 	}
 	t.Logf("native Windows volume verified: %s", actual)
+}
+
+func TestMoveWindowsBlockedHandle(t *testing.T) {
+	s, _, req := moveFixture(t)
+	root, err := openOutputDirectory(req.OutputDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	disk := downloadDisk{root: root}
+	if err := s.diskSetup(&disk); err != nil {
+		t.Fatal(err)
+	}
+	source, err := disk.writeClosed("probe", []byte("owned"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := root.Open(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = disk.publish(source, "final.pdf")
+	held.Close()
+	if !errors.Is(err, ErrOutputAccess) || errors.Is(err, ErrUnsupportedFilesystem) {
+		t.Fatalf("wrong sharing diagnosis: %v", err)
+	}
+	if _, err := root.Stat("final.pdf"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("failed publication created final")
+	}
+	if err := disk.publish(source, "final.pdf"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMoveWindowsSymlinkSource(t *testing.T) {
+	s, _, req := moveFixture(t)
+	root, err := openOutputDirectory(req.OutputDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	disk := downloadDisk{root: root}
+	if err := s.diskSetup(&disk); err != nil {
+		t.Fatal(err)
+	}
+	source, err := disk.writeClosed("probe", []byte("original"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(req.OutputDirectory, source), filepath.Join(req.OutputDirectory, "link.tmp")); err != nil {
+		t.Skipf("filesystem/account cannot create symlinks: %v", err)
+	}
+	if err := disk.publish("link.tmp", "final.pdf"); !errors.Is(err, ErrUnsafeDestination) {
+		t.Fatal("symlink source accepted", err)
+	}
 }

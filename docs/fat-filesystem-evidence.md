@@ -11,15 +11,21 @@ court/client documents and make no paid AI or court requests.
 | Linux consuming-backend state machine: `go test ./arcourt -run TestMove -count=1 -timeout=180s` | PASS |
 | Windows amd64 package cross-compilation: `GOOS=windows GOARCH=amd64 go test -c ./arcourt` | PASS; compilation only |
 | Linux `go test -race ./... -count=1 -timeout=180s` | PASS |
-| Desktop `go test ./internal/app -count=1 -timeout=180s` | PASS |
+| Desktop controller tests, race tests, and vet | PASS |
 | Root `go vet ./...`, `go build ./...`, `git diff --check` | PASS |
 | Native Windows NTFS tests | Pending hosted CI |
-| Native Windows FAT32/exFAT VHD tests | Pending hosted CI; required jobs added |
+| Native Windows FAT32 VHD tests | PASS: [job 118942593987](https://github.com/tlfjar/ArcourtDownloader/actions/runs/39514286656/job/118942593987) |
+| Native Windows exFAT VHD tests | PASS: [job 118942594020](https://github.com/tlfjar/ArcourtDownloader/actions/runs/39514286656/job/118942594020) |
 | Physical USB/SD/external media and removal/power-loss tests | NOT RUN; no hardware available in Linux workspace |
 | Interactive Windows desktop walkthrough | NOT RUN; no native GUI session available |
 
-The implementation is a candidate pending native-volume evidence. A cross-build
-or Unix test result must not be described as verified FAT32/exFAT support.
+Native-volume results above are for implementation commit `a062974116016d848b36285165b84992c37b95ab`,
+Go 1.26.9 windows/amd64, Windows Server 2025 (10.0.26100), and freshly formatted
+128 MiB VHDs. Both jobs verified the actual filesystem and passed every selected
+test with no skips. Additional consumed-name, naming-cancellation, sharing-handle,
+and symlink-source tests are being added; their native results must be recorded
+separately. These results establish the tested Windows-driver/VHD scope, not
+universal removable-device or arbitrary power-loss support.
 
 ## Behavioral boundaries
 

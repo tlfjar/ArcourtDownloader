@@ -447,3 +447,58 @@ func TestMoveCancellationAfterReceipt(t *testing.T) {
 		}
 	}
 }
+
+func TestMoveDoesNotRemoveRecreatedStagingName(t *testing.T) {
+	s, _, req := moveFixture(t)
+	var temp string
+	recreated := false
+	s.diskBefore = func(op, name string) error {
+		dir := filepath.Join(req.OutputDirectory, "case-60cv-2026-1")
+		if op == "publish.move" {
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				return err
+			}
+			for _, entry := range entries {
+				if pdfTempPattern.MatchString(entry.Name()) {
+					temp = entry.Name()
+				}
+			}
+		}
+		if op == "manifest.create" && temp != "" && !recreated {
+			recreated = true
+			return os.WriteFile(filepath.Join(dir, temp), []byte("unrelated replacement"), 0600)
+		}
+		return nil
+	}
+	r, err := s.Download(context.Background(), req, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !recreated {
+		t.Fatal("did not exercise consumed name")
+	}
+	data, err := os.ReadFile(filepath.Join(r.Directory, temp))
+	if err != nil || string(data) != "unrelated replacement" {
+		t.Fatal("deleted new file at consumed name", err)
+	}
+}
+
+func TestMoveNamingCancellationFinalizesVerifiedPDF(t *testing.T) {
+	s, f, req := moveFixture(t)
+	pdf := syntheticNamingPDF([]string{"DEFENDANT'S MOTION TO COMPEL", "Defendant asks for discovery."})
+	f.data = map[string]string{req.Selection[0].SourceURL: string(pdf)}
+	req.Naming = &NamingRequest{Provider: "xai", Model: "grok-test", APIKey: "TEST-SECRET"}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := &fakeNamingClient{fn: func(ctx context.Context, _ string) (string, error) { cancel(); return "", ctx.Err() }}
+	s.namingClientFactory = func(NamingRequest, http.RoundTripper) (namingClient, error) { return client, nil }
+	r, err := s.Download(ctx, req, nil)
+	if !errors.Is(err, context.Canceled) || !r.Documents[0].Saved || r.Documents[0].Naming.Reason != "canceled" {
+		t.Fatalf("verified PDF lost: %+v %v", r, err)
+	}
+	data, err := os.ReadFile(filepath.Join(r.Directory, r.Documents[0].Filename))
+	if err != nil || string(data) != string(pdf) {
+		t.Fatal("PDF changed", err)
+	}
+}
