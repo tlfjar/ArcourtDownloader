@@ -8,10 +8,13 @@ import (
 )
 
 var (
-	ErrDownloadBusy      = errors.New("a case operation is already active")
-	ErrOutputBusy        = errors.New("another download owns this case directory")
-	ErrUnsafeDestination = errors.New("unsafe output destination")
-	ErrManifest          = errors.New("local manifest could not be read or saved")
+	ErrDownloadBusy          = errors.New("a case operation is already active")
+	ErrOutputBusy            = errors.New("another download owns this case directory")
+	ErrUnsafeDestination     = errors.New("unsafe output destination")
+	ErrUnsupportedFilesystem = errors.New("output filesystem lacks a supported no-overwrite publication capability")
+	ErrOutputAccess          = errors.New("output access or file sharing prevents publication")
+	ErrRecoveryRequired      = errors.New("interrupted publication requires manual review")
+	ErrManifest              = errors.New("local manifest could not be read or saved")
 )
 
 const (

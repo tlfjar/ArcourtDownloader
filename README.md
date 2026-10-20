@@ -20,8 +20,13 @@ selected PDF directly to the provider you choose.
 2. On **Windows 11 x64**, install the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
    if it is missing. Install Microsoft Edge or Google Chrome for case-page access;
    the desktop interface and browser automation have separate requirements.
-3. Have an existing, writable **local NTFS folder** ready for downloads. Network
-   shares, FAT/exFAT volumes, and symlink or junction destinations are unsupported.
+3. Have an existing, writable **local folder** ready for downloads. NTFS keeps
+   the established hard-link publication/recovery path. Windows FAT32/exFAT use
+   a capability-checked no-replace rename backend with conservative interrupted
+   recovery; see the [filesystem contract](docs/filesystem-download-service.md).
+   Native-volume verification is tracked in [test evidence](docs/fat-filesystem-evidence.md);
+   do not infer removable-hardware or power-loss guarantees from synthetic tests.
+   Network shares and symlink or junction destinations remain unsupported.
 
 Public Windows executables are unsigned, so Windows SmartScreen may show a warning.
 Releases provide SHA-256 checksums and GitHub artifact attestations for verifying
@@ -110,7 +115,7 @@ Manager; settings and manifests contain no key, excerpt, or raw provider reply.
 | Desktop app will not open | Install or repair WebView2. Edge or Chrome alone does not provide the desktop runtime. |
 | Browser setup fails | Install Edge or Chrome, or correct the executable path in Settings. |
 | Preview is empty or shows the wrong case | Check the URL template and case number. Do not download a mismatched case. |
-| Output folder fails | Choose an existing, writable local NTFS folder. Avoid shares, junctions, and files open in another app. |
+| Output folder fails | Check permissions and close apps holding output files. Unsupported-capability errors require a different local folder (NTFS is the established fallback). An interrupted-publication review error preserves files; use a new empty output folder or inspect the recovery receipt before moving it aside. |
 | Some documents did not download | Check the per-document result and discovery warnings, then retry eligible items. |
 | AI naming used a standard filename | Check provider, model, consent and key status in Settings. Image-only or unclear PDFs also use standard names. The PDF may still have saved successfully. |
 | A record requires authentication or shows CAPTCHA | Use the site's authorized workflow; this app does not bypass access controls or import credentials. |
