@@ -20,7 +20,7 @@ the busy slot. The root service and fetcher are shared with the CLI.
 The nested `desktop/go.mod` deliberately replaces the root module with `..`, the
 root of **this same repository**, and has its own `go.sum`. No parent workspace or
 external repository is required. Wails resolves `golang.org/x/sys` v0.46.0 in the
-desktop module; the root keeps v0.42.0. Root Go tests/builds exclude the nested
+desktop module; the root keeps v0.44.0. Root Go tests/builds exclude the nested
 module and need no GUI tools.
 
 Use Windows 11 x64, a supported patched Go 1.26+ toolchain, and Node.js 24 LTS or

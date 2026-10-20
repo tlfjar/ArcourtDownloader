@@ -40,3 +40,14 @@ The native-volume harness and CI jobs exercise real Windows filesystem drivers
 on disposable VHDs. Even a passing VHD suite cannot establish arbitrary power-loss
 survival or the behavior of all removable-device controllers. File synchronization
 is retained; no stronger durability promise is made.
+
+## Dependency gate
+
+The first root Windows vulnerability scan identified GO-2026-5024 at the newly
+used `windows.NewNTUnicodeString` call in x/sys v0.42.0. The new backend already
+bounds basenames to 160 bytes, below the overflow condition, but the root module
+is upgraded to v0.44.0, the first fixed version. The desktop retains v0.46.0.
+The license text is byte-identical; the catalog checksum/version and generated
+notices are updated. See the [Go advisory](https://pkg.go.dev/vuln/GO-2026-5024).
+Revalidation of the final dependency set is required; the initial failure is not
+being waived or hidden.

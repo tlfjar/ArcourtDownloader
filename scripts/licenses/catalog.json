@@ -548,10 +548,10 @@
     },
     {
       "Name": "golang.org/x/sys",
-      "Version": "v0.42.0",
+      "Version": "v0.44.0",
       "License": "BSD-3-Clause",
       "Source": "https://golang.org/x/sys",
-      "Sum": "h1:omrd2nAlyT5ESRdCLYdm3+fMfNFE/+Rf4bDIQImRJeo=",
+      "Sum": "h1:ildZl3J4uzeKP07r2F++Op7E9B29JRUy+a27EibtBTQ=",
       "Materials": [
         {
           "Path": "LICENSE",

@@ -61,12 +61,18 @@ func TestMoveWindowsBlockedHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	held, err := root.Open(source)
+	// os.Root.Open permits delete sharing on modern Go. Use an explicit
+	// Windows reader that denies delete sharing to model a blocking editor.
+	path, err := windows.UTF16PtrFromString(filepath.Join(req.OutputDirectory, source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := windows.CreateFile(path, windows.GENERIC_READ, windows.FILE_SHARE_READ, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = disk.publish(source, "final.pdf")
-	held.Close()
+	windows.CloseHandle(held)
 	if !errors.Is(err, ErrOutputAccess) || errors.Is(err, ErrUnsupportedFilesystem) {
 		t.Fatalf("wrong sharing diagnosis: %v", err)
 	}
