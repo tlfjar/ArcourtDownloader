@@ -76,7 +76,10 @@ Use `--headless=false`, not `--headless false`: boolean flag values use `=`.
 All options follow `preview` or `download`. Paths containing spaces are supported,
 including relative output paths resolved against the current working directory.
 The output directory must already exist. The service rejects unsafe destinations,
-symlinks/reparse paths, and network shares; Windows NTFS is the verified filesystem.
+symlinks/reparse paths, and network shares. NTFS retains hard-link recovery;
+Windows FAT32/exFAT use a capability-checked no-replace backend and may require
+manual review after interrupted publication. See the [filesystem contract](filesystem-download-service.md)
+and its [native-volume test evidence](fat-filesystem-evidence.md).
 
 `download` always calls `Preview` again, validates the case identity, and resolves
 IDs against that fresh preview before calling the service's `Download`.

@@ -17,6 +17,7 @@ type DownloadService struct {
 	fetcher             CaseFetcher
 	active              atomic.Bool
 	diskBefore          func(operation, name string) error
+	diskSetup           func(*downloadDisk) error // private backend injection for synthetic tests
 	namingClientFactory namingClientFactory
 }
 
@@ -68,6 +69,8 @@ func localFailure(err error) string {
 	switch {
 	case err == nil:
 		return ""
+	case errors.Is(err, ErrUnsupportedFilesystem), errors.Is(err, ErrOutputAccess), errors.Is(err, ErrRecoveryRequired):
+		return filesystemFailure(err)
 	case errors.Is(err, ErrManifest):
 		return "manifest could not be saved; a published PDF may require reconciliation"
 	case errors.Is(err, context.Canceled):
@@ -223,6 +226,13 @@ func (s *DownloadService) Download(ctx context.Context, req DownloadRequest, eve
 	result.Directory = filepath.Join(req.OutputDirectory, caseDir)
 	result.ManifestPath = filepath.Join(result.Directory, ManifestFilename)
 	store := &downloadStore{disk: downloadDisk{root: root, before: s.diskBefore}}
+	setup := (*downloadDisk).selectPublisher
+	if s.diskSetup != nil {
+		setup = s.diskSetup
+	}
+	if err := setup(&store.disk); err != nil {
+		return failAll(err)
+	}
 	if err := store.load(result.CaseNumber); err != nil {
 		return failAll(err)
 	}

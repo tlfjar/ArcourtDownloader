@@ -33,7 +33,7 @@ and compares the complete module set and sums with `debug/buildinfo` from the
 actual PE files. The GUI tags must be exactly
 `desktop,wv2runtime.error,production`; CLI tags must be empty. The desktop's
 local root-module replacement is checked and uses the same stamped source
-commit, not the placeholder `v0.0.0`. `golang.org/x/sys` is v0.42.0 in the CLI
+commit, not the placeholder `v0.0.0`. `golang.org/x/sys` is v0.44.0 in the CLI
 and v0.46.0 in the GUI; both versions remain in notices and SPDX.
 
 - The application npm lockfile contains no third-party dependencies. The four

@@ -173,3 +173,40 @@ PDF, open it, repeat to verify a skip, then close and check owned-browser cleanu
 Keep case identifiers, docket labels, documents, URLs, and screenshots private.
 The production human walkthrough and final unsigned-candidate live check remain
 pending; do not substitute synthetic tests for them.
+
+## FAT32/exFAT publication fixtures
+
+The regular suite runs `TestMove*` with a consuming no-replace state-machine
+substitute on Unix and the actual Windows handle-relative rename on Windows.
+Unix success does not establish Windows or FAT32/exFAT support. The
+`TestWindowsFilesystemFixture` test explicitly skips without a supplied volume.
+
+On an elevated Windows host with Go on PATH:
+
+```powershell
+./scripts/test-windows-filesystems.ps1 -Filesystem FAT32 -Require
+./scripts/test-windows-filesystems.ps1 -Filesystem exFAT -Require
+```
+
+The harness creates and formats only its own disposable 128 MiB VHD, assigns an
+unused drive letter, validates the actual filesystem in Go, and runs `TestMove*`
+using production capability selection. It detaches that exact VHD in `finally`.
+It never accepts or formats a physical disk. Without `-Require`, unavailable
+Windows/admin fixtures are reported as explicit skips; CI requires them and
+fails if unavailable. Logs are under ignored `build/filesystem-tests/` and CI
+uploads them. Native volumes exercise staging, PDF screening, naming fallback,
+first and replacement manifests, receipt publication, collisions, competing
+publishers/services, cancellation, verified repeats, and subprocess interruption.
+
+For an already formatted USB/SD/external volume, set `ARCOURT_TEST_VOLUME_ROOT`
+to an existing local absolute directory and `ARCOURT_TEST_VOLUME_FS` to `FAT32`
+or `exFAT`, then run:
+
+```powershell
+go test ./arcourt -run '^(TestMove|TestWindowsFilesystemFixture)' -v -count=1 -timeout=180s
+```
+
+Only uniquely created test subdirectories are written/removed. Physical-media
+removal, arbitrary power loss, driver-specific durability, and a human GUI/CLI
+walkthrough on removable hardware remain separate manual checks. Record actual
+results and skips in [filesystem evidence](fat-filesystem-evidence.md).

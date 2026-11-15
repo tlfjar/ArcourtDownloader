@@ -97,6 +97,7 @@ func openRegular(root *os.Root, name string, flags int) (*os.File, error) {
 
 type downloadDisk struct {
 	root *os.Root
+	move func(root *os.Root, source, target string) error
 	// Private deterministic failure injection; no permissions or full-disk tricks.
 	before func(operation, name string) error
 }

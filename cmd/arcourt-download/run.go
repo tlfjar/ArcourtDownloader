@@ -218,6 +218,9 @@ func errorCode(err error) int {
 
 // Never print underlying transport errors: they can contain signed request URLs.
 func operationError(err error) string {
+	if message := arcourt.FilesystemErrorMessage(err); message != "" {
+		return message
+	}
 	switch {
 	case errors.Is(err, context.Canceled):
 		return "operation canceled; any completed PDFs remain saved"

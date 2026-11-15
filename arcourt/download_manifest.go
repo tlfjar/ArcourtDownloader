@@ -133,7 +133,7 @@ func (s *downloadStore) load(caseNumber string) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Join(ErrManifest, err)
+		return errors.Join(ErrManifest, publicationError(err))
 	}
 	if m.Version != ManifestVersion || m.CaseNumber != caseNumber {
 		return ErrManifest
@@ -174,10 +174,12 @@ func (s *downloadStore) save() (err error) {
 	}
 	tmp, err := s.disk.writeClosed("manifest", append(data, '\n'))
 	if err != nil {
-		return errors.Join(ErrManifest, err)
+		return errors.Join(ErrManifest, publicationError(err))
 	}
 	defer func() {
-		err = errors.Join(err, s.disk.remove(tmp))
+		if tmp != "" {
+			err = errors.Join(err, s.disk.remove(tmp))
+		}
 		if err != nil {
 			err = errors.Join(ErrManifest, err)
 		}
@@ -189,7 +191,7 @@ func (s *downloadStore) save() (err error) {
 		}
 		// The first manifest must not clobber an independently created file.
 		if err = s.disk.check("manifest.publish", ManifestFilename); err == nil {
-			err = s.disk.root.Link(tmp, ManifestFilename)
+			err = s.disk.publish(tmp, ManifestFilename)
 		}
 	} else {
 		if err != nil || isReparse(current) || !os.SameFile(current, s.manifestInfo) {
@@ -200,7 +202,10 @@ func (s *downloadStore) save() (err error) {
 		}
 	}
 	if err != nil {
-		return errors.Join(ErrManifest, err)
+		return errors.Join(ErrManifest, publicationError(err))
+	}
+	if s.disk.move != nil {
+		tmp = ""
 	}
 	s.manifestInfo, err = s.disk.root.Lstat(ManifestFilename)
 	return err
@@ -276,7 +281,11 @@ func (s *downloadStore) verified(ctx context.Context, id string) (LocalDocumentR
 }
 
 func (s *downloadStore) receipt(temp string, r LocalDocumentResult) (name string, err error) {
-	data, err := json.Marshal(publishReceipt{ManifestVersion, s.manifest.CaseNumber, temp, r})
+	version := ManifestVersion
+	if s.disk.move != nil {
+		version = 2
+	} // old binaries must reject non-witness recovery
+	data, err := json.Marshal(publishReceipt{version, s.manifest.CaseNumber, temp, r})
 	if err != nil || len(data) > maxManifestBytes {
 		return "", ErrManifest
 	}
@@ -284,13 +293,20 @@ func (s *downloadStore) receipt(temp string, r LocalDocumentResult) (name string
 	if err != nil {
 		return "", err
 	}
-	defer func() { err = errors.Join(err, s.disk.remove(staged)) }()
+	defer func() {
+		if staged != "" {
+			err = errors.Join(err, s.disk.remove(staged))
+		}
+	}()
 	name = ".arcourt-receipt-" + strings.TrimSuffix(strings.TrimPrefix(temp, ".arcourt-pdf-"), ".tmp") + ".json"
 	if err = s.disk.check("receipt.publish", name); err == nil {
-		err = s.disk.root.Link(staged, name)
+		err = s.disk.publish(staged, name)
 	}
 	if err != nil {
 		return "", err
+	}
+	if s.disk.move != nil {
+		staged = ""
 	}
 	return name, nil
 }
@@ -309,11 +325,36 @@ func (s *downloadStore) recover(ctx context.Context) error {
 		}
 		var receipt publishReceipt
 		if _, err := readLocalJSON(s.disk.root, name, &receipt); err != nil {
-			return errors.Join(ErrManifest, err)
+			return errors.Join(ErrManifest, publicationError(err))
 		}
 		r := receipt.Document
-		if receipt.Version != ManifestVersion || receipt.CaseNumber != s.manifest.CaseNumber || !pdfTempPattern.MatchString(receipt.Temporary) || !validRecord(r) || !r.Saved {
+		if (receipt.Version != ManifestVersion && receipt.Version != 2) || receipt.CaseNumber != s.manifest.CaseNumber || !pdfTempPattern.MatchString(receipt.Temporary) || !validRecord(r) || !r.Saved {
 			return ErrManifest
+		}
+		if receipt.Version == 2 {
+			// A consumed staging name cannot witness identity after a crash.
+			// Never adopt or remove a PDF (or a reappeared temp) from its hash.
+			// A previously committed manifest may still verify an ordinary repeat.
+			committed := false
+			for _, old := range s.manifest.Documents {
+				if old.Saved && old.DocumentID == r.DocumentID && old.Filename == r.Filename && old.Size == r.Size && old.SHA256 == r.SHA256 {
+					committed = true
+					break
+				}
+			}
+			_, tempErr := s.disk.root.Lstat(receipt.Temporary)
+			size, hash, verifyErr := s.inspectPDF(ctx, r.Filename)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if !committed || !errors.Is(tempErr, os.ErrNotExist) || verifyErr != nil || size != r.Size || hash != r.SHA256 {
+				return ErrRecoveryRequired
+			}
+			// Only retire the recognized receipt. No unproven data-file cleanup.
+			if err := s.disk.remove(name); err != nil {
+				return err
+			}
+			continue
 		}
 		// The complete temporary hard link witnesses our ownership of the final
 		// file. Mere matching bytes or a predictable name do not establish it.

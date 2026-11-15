@@ -172,6 +172,9 @@ func outcome(r *arcourt.LocalDownloadResult, err error, allCoverage *arcourt.Dis
 }
 
 func operationError(err error) string {
+	if message := arcourt.FilesystemErrorMessage(err); message != "" {
+		return message
+	}
 	switch {
 	case err == nil:
 		return ""

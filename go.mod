@@ -6,7 +6,7 @@ require (
 	github.com/chromedp/chromedp v0.15.1
 	github.com/giraffesyo/pdf v0.7.0
 	github.com/zendev-sh/goai v0.10.6
-	golang.org/x/sys v0.42.0
+	golang.org/x/sys v0.44.0
 )
 
 require (
