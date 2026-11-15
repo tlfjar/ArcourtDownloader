@@ -29,12 +29,14 @@ func (d *downloadDisk) probeMove() (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, d.remove(source)) }()
+	cleanupSource := source
+	defer func() { err = errors.Join(err, d.remove(cleanupSource)) }()
 	target, err := d.writeClosed("probe", []byte("arcourt target"))
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, d.remove(target)) }()
+	cleanupTarget := target
+	defer func() { err = errors.Join(err, d.remove(cleanupTarget)) }()
 	check := func(name, want string) bool {
 		f, e := openRegular(d.root, name, os.O_RDONLY)
 		if e != nil {
@@ -57,9 +59,12 @@ func (d *downloadDisk) probeMove() (err error) {
 	if err = d.remove(target); err != nil {
 		return err
 	}
+	cleanupTarget = ""
 	if err = d.publish(source, target); err != nil {
 		return err
 	}
+	cleanupSource = ""
+	cleanupTarget = target
 	if _, e := d.root.Lstat(source); !errors.Is(e, os.ErrNotExist) || !check(target, "arcourt source") {
 		return ErrUnsupportedFilesystem
 	}

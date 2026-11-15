@@ -405,6 +405,71 @@ func TestMoveProbeRejectsOverwrite(t *testing.T) {
 	}
 }
 
+func TestMoveProbeCleanupOwnership(t *testing.T) {
+	for _, mode := range []string{"success", "target collision", "source recreated", "move failure"} {
+		t.Run(mode, func(t *testing.T) {
+			dir := t.TempDir()
+			root, err := openOutputDirectory(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer root.Close()
+			var source, target string
+			calls := 0
+			disk := downloadDisk{root: root, move: func(r *os.Root, a, b string) error {
+				calls++
+				source, target = a, b
+				if calls == 2 && mode == "target collision" {
+					if err := os.WriteFile(filepath.Join(dir, b), []byte("unrelated"), 0600); err != nil {
+						return err
+					}
+				}
+				if calls == 2 && mode == "move failure" {
+					return os.ErrPermission
+				}
+				err := testMoveNoReplace(r, a, b)
+				if err == nil && calls == 2 && mode == "source recreated" {
+					return os.WriteFile(filepath.Join(dir, a), []byte("unrelated"), 0600)
+				}
+				return err
+			}}
+			err = disk.probeMove()
+			switch mode {
+			case "success":
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "target collision":
+				if !errors.Is(err, os.ErrExist) {
+					t.Fatalf("expected collision, got %v", err)
+				}
+			case "source recreated":
+				if !errors.Is(err, ErrUnsupportedFilesystem) {
+					t.Fatalf("expected unsupported filesystem, got %v", err)
+				}
+			case "move failure":
+				if !errors.Is(err, os.ErrPermission) {
+					t.Fatalf("expected move failure, got %v", err)
+				}
+			}
+			if calls != 2 {
+				t.Fatalf("expected two publication attempts, got %d", calls)
+			}
+			for _, name := range []string{source, target} {
+				data, readErr := os.ReadFile(filepath.Join(dir, name))
+				preserved := (mode == "target collision" && name == target) || (mode == "source recreated" && name == source)
+				if preserved {
+					if readErr != nil || string(data) != "unrelated" {
+						t.Fatalf("unrelated file %s was not preserved: %q, %v", name, data, readErr)
+					}
+				} else if !errors.Is(readErr, os.ErrNotExist) {
+					t.Fatalf("probe file %s was not cleaned up: %v", name, readErr)
+				}
+			}
+		})
+	}
+}
+
 func TestMoveRejectsTraversal(t *testing.T) {
 	s, _, req := moveFixture(t)
 	root, err := openOutputDirectory(req.OutputDirectory)
