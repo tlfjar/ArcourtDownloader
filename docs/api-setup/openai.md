@@ -50,10 +50,10 @@ The [models page](https://developers.openai.com/api/docs/models) lists each
 - **Inputs.** PDFs with usable text need text input only. Scanned pages are sent
   as PNG or JPEG images and need a model that accepts image input. The models
   page shows each model's supported inputs.
-- **Evaluated or example.** `gpt-6-luna` is the only model whose text-excerpt
-  naming quality this project has measured. Its scanned-page image naming, and
-  every other OpenAI model ID, are unmeasured and experimental even though the
-  connector supports them. See the [evidence](../ai-document-naming.md#benchmark-and-evidence).
+- **Evaluated or example.** `gpt-6-luna` is the only model that passed the
+  current held-out text-excerpt quality gates. An earlier `gpt-4.1-mini` benchmark
+  failed its gates. Scanned-page image naming remains unmeasured and experimental.
+  See the [evidence](../ai-document-naming.md#benchmark-and-evidence).
 
 ## 5. Enter the values in ArcourtDownloader
 

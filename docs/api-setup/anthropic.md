@@ -15,8 +15,8 @@ email.
 ## 1. Open the Claude Console
 
 Sign in or create an account at the [Claude Console](https://platform.claude.com).
-The Console groups keys and billing under an organization, with optional
-workspaces; the defaults are enough for this app. The
+The Console groups keys and billing under an organization and workspaces; the
+Default Workspace is enough for this app. The
 [API key guide](https://platform.claude.com/docs/en/get-api-key) describes the
 current steps.
 
@@ -36,11 +36,12 @@ limits your organization can set.
 ## 3. Create and copy an API key
 
 On the Console's [API keys page](https://platform.claude.com/settings/keys),
-create a key and give it a name, following the
+create a workspace-scoped key and give it a name, following the
 [API key guide](https://platform.claude.com/docs/en/get-api-key). The full key,
 which starts with `sk-ant-`, is shown only once. Copy it then and keep it only
-until you finish step 5. A key created and named just for this app is easy to
-revoke later without affecting anything else.
+until you finish step 5. Do not use an unscoped key: the app does not send a
+workspace ID header. A key created and named just for this app is easy to revoke
+later without affecting anything else.
 
 ## 4. Choose a model ID
 
