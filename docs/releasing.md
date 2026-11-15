@@ -91,8 +91,9 @@ The public assets are exactly:
 
 The ZIP contains the two executables, `LICENSE`, `THIRD_PARTY_NOTICES.txt`,
 `README.md`, `SUPPORT.md`, `SECURITY.md`, `BUILD.json`, `SBOM.spdx.json`,
-`FILE_SHA256SUMS.txt`, and the allowlisted `docs/command-line-workflow.md` and
-`docs/releasing.md`. The internal checksum file hashes every other ZIP payload
+`FILE_SHA256SUMS.txt`, and the allowlisted documents under `docs/`:
+`ai-connector-evaluation.md`, `ai-document-naming.md`, the four provider guides
+in `api-setup/`, `command-line-workflow.md`, and `releasing.md`. The internal checksum file hashes every other ZIP payload
 file, including both final executables. Both checksum files use sorted paths,
 lowercase SHA-256, two spaces, UTF-8 without BOM, and LF endings.
 
