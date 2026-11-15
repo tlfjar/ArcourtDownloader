@@ -486,7 +486,7 @@
     },
     {
       "Name": "Go standard library",
-      "Version": "go1.26.9",
+      "Version": "go1.26.11",
       "License": "BSD-3-Clause AND MIT AND BSD-1-Clause AND SunPro AND LicenseRef-Cephes AND LicenseRef-Rijndael",
       "Source": "https://go.dev/LICENSE",
       "Materials": [
@@ -534,10 +534,10 @@
     },
     {
       "Name": "golang.org/x/net",
-      "Version": "v0.56.0",
+      "Version": "v0.62.0",
       "License": "BSD-3-Clause",
       "Source": "https://golang.org/x/net",
-      "Sum": "h1:Rw8j/hFzGvJUZwNBXnAtf5sVDVt+65SK2C7IxCxZt5o=",
+      "Sum": "h1:18ELalfM5+XNRwzM2nYqXsZQ9ByS1uhj2O/U7+5jqRY=",
       "Materials": [
         {
           "Path": "LICENSE",
@@ -562,10 +562,10 @@
     },
     {
       "Name": "golang.org/x/sys",
-      "Version": "v0.46.0",
+      "Version": "v0.49.0",
       "License": "BSD-3-Clause",
       "Source": "https://golang.org/x/sys",
-      "Sum": "h1:noSf2Fq6F8DBgS+LysIkx7rIExoNHJsxOAtPp4rthXw=",
+      "Sum": "h1:XbzkgYJHdqh/8m2Uu0W/dQv8nktxx4BFHp1M0gROTXA=",
       "Materials": [
         {
           "Path": "LICENSE",
@@ -576,10 +576,10 @@
     },
     {
       "Name": "golang.org/x/text",
-      "Version": "v0.39.0",
+      "Version": "v0.43.0",
       "License": "BSD-3-Clause",
       "Source": "https://golang.org/x/text",
-      "Sum": "h1:UbZz4pLOvn600D6Oh6GGEI6VAmndrEBLv8/6BEXzyus=",
+      "Sum": "h1:1QivrlhwAsnMOcqgOdl9my7s9OyZl8O5/UGUTJVXoWc=",
       "Materials": [
         {
           "Path": "LICENSE",

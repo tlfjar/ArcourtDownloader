@@ -4,6 +4,8 @@ AI naming is off by default. It runs only for a newly downloaded, selected PDF a
 
 ## Desktop workflow
 
+If you do not yet have provider API access, a key, or a model ID, start with the setup guide for [OpenAI](api-setup/openai.md), [xAI](api-setup/xai.md), [Anthropic](api-setup/anthropic.md), or [Google](api-setup/google.md).
+
 1. In **Settings & diagnostics → Optional AI document names**, enable naming, choose OpenAI, xAI, Anthropic, or Google, and enter a model ID available to your provider account. The application validates configuration locally; saving settings does not make a paid request.
 2. Review the direct recipient shown for the selected provider, the bounded opening-page text/image disclosure, possible sensitive content, possible API charges, and the fallback behavior. Check the recipient consent box and save settings. Changing the provider or disclosure version clears the box and requires fresh consent.
 3. Save or replace that provider's API key in the separate credential form. The form displays configured, missing, or unavailable status and can remove the key. The entered value is cleared from the UI after submission. Windows Credential Manager stores the key for the current Windows user; `settings.json` stores only the enable flag, provider, model ID, and approved recipient/disclosure version. Snapshots and download manifests never contain the key.

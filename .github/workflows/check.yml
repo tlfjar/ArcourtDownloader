@@ -29,7 +29,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: '1.26.9'
+          go-version: '1.26.11'
           cache-dependency-path: |
             go.sum
             desktop/go.sum
@@ -98,7 +98,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: '1.26.9'
+          go-version: '1.26.11'
       - run: ./scripts/check-fixtures.ps1
       - run: |
           git diff --exit-code
@@ -115,7 +115,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: '1.26.9'
+          go-version: '1.26.11'
           cache-dependency-path: |
             go.sum
             desktop/go.sum
@@ -153,7 +153,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: '1.26.9'
+          go-version: '1.26.11'
           cache-dependency-path: |
             go.sum
             desktop/go.sum
@@ -180,7 +180,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: '1.26.9'
+          go-version: '1.26.11'
       - run: ./scripts/test-release-workflow.ps1
       - name: Validate workflow syntax and action pins
         run: |

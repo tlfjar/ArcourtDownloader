@@ -1202,7 +1202,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ============================================================
-Go standard library@go1.26.9
+Go standard library@go1.26.11
 License: BSD-3-Clause AND MIT AND BSD-1-Clause AND SunPro AND LicenseRef-Cephes AND LicenseRef-Rijndael
 Source: https://go.dev/LICENSE
 
@@ -1379,7 +1379,7 @@ shall terminate as of the date such litigation is filed.
 //	EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 ============================================================
-golang.org/x/net@v0.56.0
+golang.org/x/net@v0.62.0
 License: BSD-3-Clause
 Source: https://golang.org/x/net
 
@@ -1447,7 +1447,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ============================================================
-golang.org/x/sys@v0.46.0
+golang.org/x/sys@v0.49.0
 License: BSD-3-Clause
 Source: https://golang.org/x/sys
 
@@ -1481,7 +1481,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ============================================================
-golang.org/x/text@v0.39.0
+golang.org/x/text@v0.43.0
 License: BSD-3-Clause
 Source: https://golang.org/x/text
 

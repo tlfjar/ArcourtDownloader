@@ -1,7 +1,9 @@
 # Packaging and verification require PowerShell 7.4+.
 . (Join-Path $PSScriptRoot 'common.ps1')
 $script:ReleaseRepo = Split-Path -Parent $PSScriptRoot
-$script:PayloadNames = @('ArcourtDownloader.exe', 'arcourt-download.exe', 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'README.md', 'SUPPORT.md', 'SECURITY.md', 'docs/ai-connector-evaluation.md', 'docs/ai-document-naming.md', 'docs/command-line-workflow.md', 'docs/releasing.md', 'BUILD.json', 'SBOM.spdx.json', 'FILE_SHA256SUMS.txt')
+# Reviewed source documents copied into the payload byte-for-byte (LF endings).
+$script:PayloadSourceNames = @('LICENSE', 'THIRD_PARTY_NOTICES.txt', 'README.md', 'SUPPORT.md', 'SECURITY.md', 'docs/ai-connector-evaluation.md', 'docs/ai-document-naming.md', 'docs/api-setup/anthropic.md', 'docs/api-setup/google.md', 'docs/api-setup/openai.md', 'docs/api-setup/xai.md', 'docs/command-line-workflow.md', 'docs/releasing.md')
+$script:PayloadNames = @('ArcourtDownloader.exe', 'arcourt-download.exe') + $script:PayloadSourceNames + @('BUILD.json', 'SBOM.spdx.json', 'FILE_SHA256SUMS.txt')
 
 function Get-ReviewedGoToolchain {
     $catalog = Get-Content -LiteralPath (Join-Path $script:ReleaseRepo 'scripts/licenses/catalog.json') -Raw | ConvertFrom-Json
@@ -34,6 +36,11 @@ function Assert-FileSet([string]$Directory, [string[]]$Expected) {
         }
     })
     if (@(Compare-Object ($Expected | Sort-Object) ($actual | Sort-Object) -CaseSensitive).Count) { throw 'Missing or unexpected payload files.' }
+}
+function New-PayloadDirectories([string]$Root) {
+    foreach ($directory in @($script:PayloadNames | ForEach-Object { Split-Path -Parent $_ } | Where-Object { $_ } | Sort-Object -Unique)) {
+        New-Item -ItemType Directory -Path (Join-Path $Root $directory) -Force | Out-Null
+    }
 }
 function Write-Checksums([string]$Directory, [string[]]$Names, [string]$OutputName) {
     $lines = foreach ($name in ($Names | Sort-Object -CaseSensitive)) { '{0}  {1}' -f (Get-SHA256 (Join-Path $Directory $name)), $name }
@@ -94,7 +101,7 @@ function Assert-Payload([string]$Directory, $Identity) {
     $suffix = if ($Identity.release) { '; release source' } else { '; development, unsigned' }
     if ($resource.FileVersion -cne $Identity.windowsVersion -or $resource.ProductVersion -cne $Identity.windowsVersion -or $resource.Comments -cne "$($Identity.version); source $($Identity.commit)$suffix") { throw 'GUI Windows resource identity mismatch.' }
     foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { Assert-UnsignedExecutable (Join-Path $Directory $name) }
-    foreach ($name in @('LICENSE','THIRD_PARTY_NOTICES.txt','README.md','SUPPORT.md','SECURITY.md','docs/ai-connector-evaluation.md','docs/ai-document-naming.md','docs/command-line-workflow.md','docs/releasing.md')) {
+    foreach ($name in $script:PayloadSourceNames) {
         if ([IO.File]::ReadAllText((Join-Path $Directory $name)) -cne [IO.File]::ReadAllText((Join-Path $script:ReleaseRepo $name)).Replace("`r`n","`n")) { throw "Payload differs from reviewed source: $name" }
     }
     $temporary = Join-Path ([IO.Path]::GetTempPath()) ('arcourt-sbom-' + [Guid]::NewGuid().ToString('N') + '.json')

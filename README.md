@@ -64,6 +64,16 @@ Windows Credential Manager using the separate **Save or replace key** action.
 You can remove it there later. The app shows whether a key is configured but
 never displays a stored key.
 
+**Set up API access.** Each guide goes from a new provider API account to these
+settings, with no SDK or code required.
+
+| Provider | Setup guide |
+| --- | --- |
+| OpenAI | [OpenAI API setup](docs/api-setup/openai.md) |
+| xAI (Grok) | [xAI API setup](docs/api-setup/xai.md) |
+| Anthropic (Claude) | [Anthropic API setup](docs/api-setup/anthropic.md) |
+| Google (Gemini) | [Google API setup](docs/api-setup/google.md) |
+
 For newly downloaded, complete PDFs, the Go core inspects at most the first two
 pages locally. It sends a small title-centered text excerpt when usable, with one
 bounded expansion if needed; for scanned pages, it instead sends up to two
