@@ -30,7 +30,7 @@ try {
             if ($entry.Length -gt 100MB) { throw 'Oversized ZIP entry.' }
         }
         if ($seen.Count -ne $script:PayloadNames.Count) { throw 'Missing archive payload (license/notice/SBOM required).' }
-        New-Item -ItemType Directory -Path (Join-Path $extract 'docs') | Out-Null
+        New-PayloadDirectories $extract
         foreach ($entry in $zip.Entries) { [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $extract $entry.FullName), $false) }
     } finally { $zip.Dispose() }
     if ((Get-SHA256 (Join-Path $extract 'SBOM.spdx.json')) -cne (Get-SHA256 (Join-Path $assets $sbomName))) { throw 'Internal/external SBOM mismatch.' }
