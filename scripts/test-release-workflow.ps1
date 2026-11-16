@@ -267,6 +267,7 @@ try {
     Reject 'prepare existing remote tag' { & $prepare -Tag 'v4.0.0' } 'Tag.*already exists'
     $global:ArcourtWorkflowTestState.DispatchFailure=$true
     Reject 'prepare failed dispatch' { & $prepare -Tag 'v4.0.2' } 'gh failed'
+    $global:LASTEXITCODE=0
     if ($global:ArcourtWorkflowTestState.TagWrites -ne 2 -or $global:ArcourtWorkflowTestState.Dispatches -ne 2 -or $global:ArcourtWorkflowTestState.RemoteTags['refs/tags/v4.0.2'] -cne $mockCommit) { throw 'Failed dispatch did not preserve the exact tag for recovery.' }
     Write-Host 'PASS preparation: exact new tag, explicit tag-scoped dispatch, early conflict checks, recoverable dispatch failure'
 } finally {
