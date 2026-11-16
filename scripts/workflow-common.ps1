@@ -6,6 +6,23 @@ function Get-GitHubJson([string]$Endpoint) {
     if ($LASTEXITCODE -ne 0) { throw "GitHub read failed: $Endpoint" }
     return ($json | ConvertFrom-Json)
 }
+function Get-TagRelease([string]$Tag) {
+    # The authenticated list includes drafts. An API error is never absence.
+    $json = & gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect existing releases.' }
+    $matches = @($json | ConvertFrom-Json | ForEach-Object { foreach ($release in $_) { if ($release.tag_name -ceq $Tag) { $release } } })
+    if ($matches.Count -gt 1) { throw 'Ambiguous existing release.' }
+    if ($matches.Count -eq 1) { return $matches[0] }
+    return $null
+}
+function Assert-UnpublishedRelease($Release, [string]$Tag) {
+    if ($null -ne $Release -and (-not $Release.draft -or $Release.immutable -eq $true)) {
+        throw "Published/immutable release '$Tag' cannot be modified. Its assets cannot be added or replaced. Use Prepare release with a NEW version, wait for the draft ZIP, SBOM and checksums, then inspect and publish. Creating a published release first locks out asset staging."
+    }
+}
+function Assert-ReleaseEvent([string]$Event, [string]$RefType, [string]$Ref, [string]$Tag) {
+    if ($Event -cnotin @('push','workflow_dispatch') -or $RefType -cne 'tag' -or $Ref -cne "refs/tags/$Tag") { throw 'Only a release tag push or manual dispatch at a tag is authorized. Use Prepare release from main to create a new version.' }
+}
 function Receive-GitHubActionsArtifactArchive([string]$Endpoint, [string]$Path) {
     # PowerShell 7.4+ preserves native stdout bytes, including binary ZIP/EXE data.
     # gh api follows the Actions archive endpoint's redirect to the ZIP.
@@ -91,7 +108,8 @@ function Get-CandidateMarker([string]$Tag, [string]$Commit, $Hashes) {
     return '<!-- arcourt-candidate-v1:' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($record)) + ' -->'
 }
 function Assert-DraftCandidate($Release, [string]$Tag, [string]$Commit, [string]$Marker, [bool]$Prerelease, $Hashes) {
-    if (-not $Release.draft -or $Release.immutable -eq $true) { throw 'Published/immutable releases cannot be modified.' }
+    Assert-UnpublishedRelease $Release $Tag
+    if ($null -eq $Release) { throw 'Draft release is missing.' }
     if ($Release.tag_name -cne $Tag -or $Release.target_commitish -cne $Commit -or $Release.prerelease -ne $Prerelease) { throw 'Draft tag/commit/prerelease mismatch.' }
     $markers = [regex]::Matches([string]$Release.body, '<!-- arcourt-candidate-v1:[^\r\n]*? -->')
     if ($markers.Count -ne 1 -or $markers[0].Value -cne $Marker) { throw 'Draft checksum identity differs from this candidate.' }

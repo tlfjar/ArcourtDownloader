@@ -166,9 +166,38 @@ GitHub's attestation store; the public asset set remains three files.
 
 ## Create and inspect a draft
 
+**Recommended: Actions > Prepare release > Run workflow.** Select `main` and
+enter a **new** version tag, such as `v0.1.3`. The action checks protected-main
+source identity, refuses existing releases/tags, creates the tag, and dispatches
+**Unsigned draft release** at that exact tag. Follow that second run until
+**Stage draft only** succeeds and the draft contains the ZIP, SPDX SBOM and
+`SHA256SUMS.txt`. The preparation action never publishes a release. Its token
+does not trigger tag-push workflows, so the explicit tag-scoped dispatch is
+required. If dispatch fails after creating the tag, resume without moving it:
+
+```powershell
+gh workflow run release.yml --repo tlfjar/ArcourtDownloader --ref v0.1.3
+```
+
+**Do not use Releases > Draft a new release > Publish release to start a build.**
+Publishing first makes the release immutable before the workflow can attach
+assets. GitHub's automatic "Source code" ZIP/tarball downloads are source
+snapshots, not the Windows application package. There is no container image or
+installer; the application distribution is the portable Windows ZIP.
+
+The empty published `v0.1.1` and `v0.1.2` releases encountered this ordering
+problem: their Windows builds, packaging and attestations succeeded, but
+staging correctly refused to modify an already published immutable release.
+Rerunning those tags cannot repair them. Leave them unchanged and prepare a
+new version. The final candidate can be inspected in the failed run's
+`candidate-<run-id>-<attempt>` Actions artifact until its 14-day retention expires;
+it is not a staged or approved public release.
+
+Alternatively, create the tag directly:
+
 Only after the release change is merged to protected `main`, GitHub settings are
 in place, and the exact source checks are green, an operator may create a **new**
-tag. This task does not create one. On the public repository, with an
+tag. On the public repository, with an
 authenticated current GitHub CLI:
 
 ```powershell
@@ -195,9 +224,12 @@ Checked gh @('run','watch',$run,'--repo',$repo,'--exit-status')
 Checked gh @('release','view',$tag,'--repo',$repo,'--json','isDraft,isPrerelease,tagName,targetCommitish,assets,body,url')
 ```
 
-Only a `v*` tag push starts `release.yml`; there is no manual dispatch, PR,
-branch, or publication trigger. Prerelease status follows the SemVer prerelease
-field. Concurrency serializes the same tag without cancellation. A published or
+`release.yml` accepts `v*` tag pushes and manual dispatches **at a tag**, never a
+branch, PR, or publication event. Both paths enforce the same exact-tag,
+protected-main and source-verification gates. Preflight rejects already
+published/immutable releases before production build or packaging; staging
+checks again to catch publication during a run. Prerelease status follows the
+SemVer prerelease field. Concurrency serializes the same tag without cancellation. A published or
 immutable release stops staging. An existing draft must have the same tag,
 target commit, prerelease status, candidate checksum marker, asset names and
 actual downloaded asset hashes. Identical complete drafts are left alone;

@@ -48,6 +48,11 @@ foreach ($result in @('failure','cancelled','skipped','')) {
 }
 Reject 'source gate missing' { Assert-ReleaseGates @{} @('verify') } 'did not succeed'
 Reject 'release fixture build' { & (Join-Path $PSScriptRoot 'build-desktop.ps1') -Release -Fixture -Tag $tag } 'Fixture desktop builds are forbidden'
+foreach ($event in @('push','workflow_dispatch')) { Assert-ReleaseEvent $event 'tag' "refs/tags/$tag" $tag }
+Reject 'manual release from branch' { Assert-ReleaseEvent 'workflow_dispatch' 'branch' 'refs/heads/main' 'main' } 'Only a release tag'
+Reject 'publication event' { Assert-ReleaseEvent 'release' 'tag' "refs/tags/$tag" $tag } 'Only a release tag'
+Reject 'mismatched release ref' { Assert-ReleaseEvent 'push' 'tag' 'refs/tags/other' $tag } 'Only a release tag'
+Assert-UnpublishedRelease $null $tag
 
 $inputs = New-BuildDirectory $repo ('tests/workflow-inputs-' + [Guid]::NewGuid().ToString('N'))
 foreach ($name in @('ArcourtDownloader.exe','arcourt-download.exe')) { Write-Utf8 (Join-Path $inputs $name) "synthetic $name" }
@@ -112,7 +117,7 @@ try { $zip.CreateEntry('../outside.exe') | Out-Null } finally { $zip.Dispose() }
 Reject 'artifact traversal even with valid digest' { Expand-WorkflowArtifact $archive (Get-SHA256 $archive) (Join-Path $testRoot 'unsafe') ($names + 'SHA256SUMS.txt') } 'unsafe workflow artifact'
 
 # Exercise the actual draft entry point with an in-process gh boundary. No network.
-foreach ($file in @('stage-draft-release.ps1','workflow-common.ps1','release-common.ps1','common.ps1','resolve-build-info.ps1')) {
+foreach ($file in @('prepare-release.ps1','release-preflight.ps1','stage-draft-release.ps1','workflow-common.ps1','release-common.ps1','common.ps1','resolve-build-info.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $scratch 'scripts')
 }
 # Replace only the binary network boundary in the throwaway copy. A PowerShell
@@ -134,7 +139,7 @@ foreach ($name in $mockNames) { [IO.File]::WriteAllText((Join-Path $mockAssets $
 Write-Checksums $mockAssets $mockNames 'SHA256SUMS.txt'
 $mockHashes=Get-CandidateChecksums $mockAssets $mockTag
 $mockMarker=Get-CandidateMarker $mockTag $mockCommit $mockHashes
-$global:ArcourtWorkflowTestState=@{Release=$null;Writes=0;ApiFailure=$false;WrongTag=$false;AttestationCount=0}
+$global:ArcourtWorkflowTestState=@{Release=$null;Writes=0;ApiFailure=$false;WrongTag=$false;AttestationCount=0;RemoteTags=@{};TagWrites=0;Dispatches=0;DispatchFailure=$false;Main=@{name='main';protected=$true;commit=@{sha=$mockCommit}}}
 $global:ArcourtWorkflowTestState.Writes=0
 $global:ArcourtWorkflowTestState.ApiFailure=$false
 $global:ArcourtWorkflowTestState.WrongTag=$false
@@ -149,6 +154,24 @@ function gh {
     switch ($arguments[0]) {
         'api' {
             if ($global:ArcourtWorkflowTestState.ApiFailure) { $global:LASTEXITCODE=1; return }
+            if ($arguments[1] -like '*/branches/main') {
+                return ($global:ArcourtWorkflowTestState.Main | ConvertTo-Json -Depth 10)
+            }
+            if ($arguments[1] -like '*/git/matching-refs/tags/*') {
+                $ref='refs/tags/' + [Uri]::UnescapeDataString($arguments[1].Split('/')[-1])
+                $references=@(foreach ($key in $global:ArcourtWorkflowTestState.RemoteTags.Keys) {
+                    if ($key -ceq $ref) { @{ref=$key;object=@{type='commit';sha=$global:ArcourtWorkflowTestState.RemoteTags[$key]}} }
+                })
+                return (ConvertTo-Json -InputObject $references -Depth 10 -Compress)
+            }
+            if ($arguments[1] -like '*/git/refs') {
+                if ($arguments -cnotcontains 'POST' -or $arguments -cnotcontains "sha=$mockCommit") { throw 'Unsafe mocked tag creation' }
+                $ref=@($arguments | Where-Object { $_ -clike 'ref=refs/tags/*' })[0].Substring(4)
+                if ($global:ArcourtWorkflowTestState.RemoteTags.ContainsKey($ref)) { throw 'Remote tag already exists' }
+                $global:ArcourtWorkflowTestState.RemoteTags[$ref]=$mockCommit
+                $global:ArcourtWorkflowTestState.TagWrites++
+                return
+            }
             if ($arguments[1] -like '*/git/ref/tags/*') {
                 $sha = if ($global:ArcourtWorkflowTestState.WrongTag) { '0'*40 } else { $mockCommit }
                 return (@{object=@{type='commit';sha=$sha}} | ConvertTo-Json -Depth 10)
@@ -180,11 +203,18 @@ function gh {
             }
             throw 'Unexpected mocked release mutation'
         }
+        'workflow' {
+            $ref=$arguments[[Array]::IndexOf($arguments,'--ref')+1]
+            if ($arguments[1] -cne 'run' -or $arguments[2] -cne 'release.yml' -or $global:ArcourtWorkflowTestState.RemoteTags["refs/tags/$ref"] -cne $mockCommit) { throw 'Dispatch was not bound to the new tag' }
+            $global:ArcourtWorkflowTestState.Dispatches++
+            if ($global:ArcourtWorkflowTestState.DispatchFailure) { $global:LASTEXITCODE=1 }
+            return
+        }
         default { throw 'Unexpected mocked gh call' }
     }
 }
 $savedEnv=@{}
-foreach ($key in @('GITHUB_SHA','GITHUB_REPOSITORY','GITHUB_RUN_ID','RUNNER_TEMP','GITHUB_STEP_SUMMARY')) { $savedEnv[$key]=[Environment]::GetEnvironmentVariable($key) }
+foreach ($key in @('GITHUB_SHA','GITHUB_REPOSITORY','GITHUB_RUN_ID','RUNNER_TEMP','GITHUB_STEP_SUMMARY','GITHUB_EVENT_NAME','GITHUB_REF','GITHUB_REF_TYPE','GITHUB_REF_NAME')) { $savedEnv[$key]=[Environment]::GetEnvironmentVariable($key) }
 try {
     $env:GITHUB_SHA=$mockCommit; $env:GITHUB_REPOSITORY='test/repo'; $env:GITHUB_RUN_ID='12'; $env:RUNNER_TEMP=$testRoot; $env:GITHUB_STEP_SUMMARY=Join-Path $testRoot 'summary.txt'
     $entry=Join-Path $scratch 'scripts/stage-draft-release.ps1'
@@ -207,6 +237,39 @@ try {
     Reject 'entrypoint moved remote tag' { & $entry -Tag $mockTag -AssetsPath $mockAssets } 'Remote tag changed'
     if ($global:ArcourtWorkflowTestState.Writes -ne 0) { throw 'Rejected staging attempted a remote write.' }
     Write-Host 'PASS draft entrypoint: initial staging, identical rerun, partial recovery, fail-closed mutations'
+
+    $global:ArcourtWorkflowTestState.WrongTag=$false
+    $global:ArcourtWorkflowTestState.Release.draft=$false
+    $env:GITHUB_EVENT_NAME='workflow_dispatch'; $env:GITHUB_REF="refs/tags/$mockTag"; $env:GITHUB_REF_TYPE='tag'; $env:GITHUB_REF_NAME=$mockTag
+    $preflight=Join-Path $scratch 'scripts/release-preflight.ps1'
+    Reject 'preflight published release before build' { & $preflight } 'Published/immutable.*NEW version'
+    $global:ArcourtWorkflowTestState.Release=$null
+    Invoke-Native git @('-C',$scratch,'update-ref','refs/remotes/origin/main',$mockCommit)
+    & $preflight
+
+    $prepare=Join-Path $scratch 'scripts/prepare-release.ps1'
+    Reject 'prepare from tag' { & $prepare -Tag 'v4.0.0' } 'manually from main'
+    $env:GITHUB_REF='refs/heads/main'; $env:GITHUB_REF_TYPE='branch'; $env:GITHUB_REF_NAME='main'
+    Reject 'manual build at main' { & $preflight } 'Only a release tag'
+    $global:ArcourtWorkflowTestState.ApiFailure=$true
+    Reject 'prepare release API failure' { & $prepare -Tag 'v4.0.0' } 'Unable to inspect'
+    $global:ArcourtWorkflowTestState.ApiFailure=$false
+    $global:ArcourtWorkflowTestState.Release=[pscustomobject]@{tag_name='v4.0.0';draft=$false;immutable=$true}
+    Reject 'prepare existing published version' { & $prepare -Tag 'v4.0.0' } 'already exists.*NEW version'
+    $global:ArcourtWorkflowTestState.Release=$null
+    Reject 'prepare malformed version' { & $prepare -Tag 'v04.0.0' } 'SemVer'
+    $global:ArcourtWorkflowTestState.Main.protected=$false
+    Reject 'prepare unprotected main' { & $prepare -Tag 'v4.0.1' } 'protected main'
+    $global:ArcourtWorkflowTestState.Main.protected=$true
+    if ($global:ArcourtWorkflowTestState.TagWrites -ne 0 -or $global:ArcourtWorkflowTestState.Dispatches -ne 0 -or $global:ArcourtWorkflowTestState.Writes -ne 0) { throw 'Rejected preparation changed remote state.' }
+    & $prepare -Tag 'v4.0.0'
+    if ($global:ArcourtWorkflowTestState.TagWrites -ne 1 -or $global:ArcourtWorkflowTestState.Dispatches -ne 1 -or $global:ArcourtWorkflowTestState.Writes -ne 0) { throw 'Preparation did not create one tag and dispatch without publishing.' }
+    Reject 'prepare existing remote tag' { & $prepare -Tag 'v4.0.0' } 'Tag.*already exists'
+    $global:ArcourtWorkflowTestState.DispatchFailure=$true
+    Reject 'prepare failed dispatch' { & $prepare -Tag 'v4.0.2' } 'gh failed'
+    $global:LASTEXITCODE=0
+    if ($global:ArcourtWorkflowTestState.TagWrites -ne 2 -or $global:ArcourtWorkflowTestState.Dispatches -ne 2 -or $global:ArcourtWorkflowTestState.RemoteTags['refs/tags/v4.0.2'] -cne $mockCommit) { throw 'Failed dispatch did not preserve the exact tag for recovery.' }
+    Write-Host 'PASS preparation: exact new tag, explicit tag-scoped dispatch, early conflict checks, recoverable dispatch failure'
 } finally {
     Remove-Item Function:gh
     Remove-Item Function:Mock-Download
@@ -233,7 +296,7 @@ foreach ($path in (Get-ChildItem -LiteralPath (Join-Path $repo '.github/workflow
     }
 }
 $releaseYaml = Get-Content -LiteralPath (Join-Path $repo '.github/workflows/release.yml') -Raw
-if ($releaseYaml -match 'workflow_dispatch|pull_request|continue-on-error|secrets: inherit' -or $releaseYaml -notmatch "tags: \['v\*'\]" -or $releaseYaml -notmatch 'cancel-in-progress: false') { throw 'Unsafe release trigger/concurrency/fallback.' }
+if ($releaseYaml -match 'pull_request|continue-on-error|secrets: inherit' -or $releaseYaml -notmatch '(?m)^  workflow_dispatch:' -or $releaseYaml -notmatch "tags: \['v\*'\]" -or $releaseYaml -notmatch 'cancel-in-progress: false') { throw 'Unsafe release trigger/concurrency/fallback.' }
 if ([regex]::Matches($releaseYaml,'contents: write').Count -ne 1 -or [regex]::Matches($releaseYaml,'id-token: write').Count -ne 1) { throw 'Unexpected release privilege scope.' }
 if ($releaseYaml -match '(?m)^  sign:|^\s+environment:|release-signing|needs\.sign|sign-release-inputs|signing-policy|\$\{\{\s*secrets\.' ) { throw 'Signing provider or environment remains in release workflow.' }
 if ($releaseYaml -notmatch 'needs: \[preflight, verify, build\]' -or $releaseYaml -notmatch 'INPUT_ID: \$\{\{ needs\.build\.outputs\.artifact-id \}\}' -or $releaseYaml -notmatch 'INPUT_DIGEST: \$\{\{ needs\.build\.outputs\.artifact-digest \}\}' -or $releaseYaml -notmatch 'BUILD_ATTEMPT: \$\{\{ needs\.build\.outputs\.attempt \}\}' -or $releaseYaml -notmatch 'package-release-inputs.ps1' ) { throw 'Package job is not bound to exact build artifact and source gates.' }
@@ -241,4 +304,6 @@ if ($releaseYaml -notmatch 'actions/attest-build-provenance@' -or $releaseYaml -
 if ($releaseYaml -match "release','edit|--draft=false|--clobber") { throw 'Release workflow can publish or replace assets.' }
 $draftScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'stage-draft-release.ps1') -Raw
 if ($draftScript -notmatch "'--draft','--verify-tag'" -or $draftScript -match "'--clobber'|'--draft=false'") { throw 'Unsafe draft create/upload contract.' }
+$prepareYaml = Get-Content -LiteralPath (Join-Path $repo '.github/workflows/prepare-release.yml') -Raw
+if ($prepareYaml -notmatch '(?m)^  workflow_dispatch:' -or $prepareYaml -match '(?m)^  (push|pull_request|release):' -or $prepareYaml -notmatch "if: github.ref == 'refs/heads/main'" -or $prepareYaml -notmatch 'actions: write' -or $prepareYaml -notmatch 'prepare-release.ps1 -Tag \$env:RELEASE_TAG') { throw 'Unsafe preparation trigger or missing explicit dispatch permission.' }
 Write-Host "Release workflow rehearsals passed; no real tag, release or remote setting was created. Evidence: $testRoot"

@@ -16,15 +16,6 @@ function Assert-RemoteTag {
     }
     if ($reference.type -cne 'commit' -or $reference.sha -cne $identity.commit) { throw 'Remote tag changed or does not peel to event commit.' }
 }
-function Read-Release {
-    # The authenticated list includes drafts. An API error is never treated as absence.
-    $json = & gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect existing releases.' }
-    $matches = @($json | ConvertFrom-Json | ForEach-Object { foreach ($release in $_) { if ($release.tag_name -ceq $Tag) { $release } } })
-    if ($matches.Count -gt 1) { throw 'Ambiguous existing release.' }
-    if ($matches.Count -eq 1) { return $matches[0] }
-    return $null
-}
 function Assert-ExistingAssets($Release) {
     Assert-DraftCandidate $Release $Tag $identity.commit $marker $prerelease $hashes
     foreach ($asset in $Release.assets) {
@@ -38,7 +29,7 @@ function Assert-ExistingAssets($Release) {
 }
 
 Assert-RemoteTag
-$release = Read-Release
+$release = Get-TagRelease $Tag
 if ($null -ne $release) { Assert-ExistingAssets $release }
 # Verify hosted provenance before creating even an empty draft.
 foreach ($name in @("ArcourtDownloader-$Tag-windows-amd64.zip","ArcourtDownloader-$Tag-SBOM.spdx.json")) {
@@ -59,14 +50,14 @@ if ($null -eq $release) {
     $arguments = @('release','create',$Tag,'--repo',$env:GITHUB_REPOSITORY,'--draft','--verify-tag','--target',$identity.commit,'--title',"Arcourt Downloader $Tag",'--notes-file',$notesPath)
     if ($prerelease) { $arguments += '--prerelease' }
     Invoke-Native gh $arguments
-    $release = Read-Release
+    $release = Get-TagRelease $Tag
     if ($null -eq $release) { throw 'Created draft is not visible.' }
     Assert-ExistingAssets $release
 }
 $releaseId = $release.id
 foreach ($name in $hashes.Keys) {
     Assert-RemoteTag
-    $release = Read-Release
+    $release = Get-TagRelease $Tag
     if ($null -eq $release -or $release.id -ne $releaseId) { throw 'Draft was removed/replaced during staging.' }
     Assert-ExistingAssets $release
     if ($name -cnotin @($release.assets.name)) {
@@ -74,7 +65,7 @@ foreach ($name in $hashes.Keys) {
         Invoke-Native gh @('release','upload',$Tag,(Join-Path $AssetsPath $name),'--repo',$env:GITHUB_REPOSITORY)
     }
 }
-$release = Read-Release
+$release = Get-TagRelease $Tag
 if ($null -eq $release -or $release.id -ne $releaseId -or @($release.assets).Count -ne 3) { throw 'Draft readback is incomplete.' }
 Assert-RemoteTag
 Assert-ExistingAssets $release
